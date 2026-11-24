@@ -4,16 +4,21 @@
 Εξερευνήστε τρεις διαδρομές, συνδυάστε τα ευρήματα και ανάψτε ξανά το φως.
 
 Java 21. Build, tests και static analysis:
-
+Για linux
 ```sh
 mkdir -p .cache/tmp
 MAVEN_USER_HOME="$PWD/.cache/maven-user-home" TMPDIR="$PWD/.cache/tmp" ./mvnw verify
+```
+Για windows
+```sh
+mkdir -p .cache/tmp
+.\mvnw.cmd verify
 ```
 
 Τοπικό demo:
 
 ```sh
-java -Djava.io.tmpdir=.cache/tmp -cp target/classes gr.escapehub.web.DemoServer
+java "-Djava.io.tmpdir=.cache/tmp" -cp target/classes gr.escapehub.web.DemoServer
 ```
 
 1. Άνοιξε `http://127.0.0.1:8080`, γράψε ένα προσωρινό όνομα και δημιούργησε δωμάτιο.
