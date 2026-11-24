@@ -4,6 +4,7 @@
 Εξερευνήστε τρεις διαδρομές, συνδυάστε τα ευρήματα και ανάψτε ξανά το φως.
 
 Java 21. Build, tests και static analysis:
+
 Για linux
 ```sh
 mkdir -p .cache/tmp
