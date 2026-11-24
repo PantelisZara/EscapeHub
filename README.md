@@ -10,4 +10,11 @@ mkdir -p .cache/tmp
 MAVEN_USER_HOME="$PWD/.cache/maven-user-home" TMPDIR="$PWD/.cache/tmp" ./mvnw verify
 ```
 
-Ο πυρήνας προόδου είναι το πρώτο μέρος του demo· το gameplay και το UI ακολουθούν.
+Τοπικό demo:
+
+```sh
+java -Djava.io.tmpdir=.cache/tmp -cp target/classes gr.escapehub.web.DemoServer
+```
+
+Άνοιξε `http://127.0.0.1:8080`. Παίζεται το μηχανοστάσιο· φυλάκιο και ασύρματος ακολουθούν.
+Η πρόοδος είναι προσωρινή, ανά browser, και χάνεται όταν κλείσει ο server.

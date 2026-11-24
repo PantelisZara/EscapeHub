@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172a38">
+  <title>Το τελευταίο σήμα — EscapeHub</title>
+  <link rel="icon" href="/lighthouse.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main class="game">
+  <header class="masthead">
+    <div><span class="brand">EscapeHub</span><h1>Το τελευταίο σήμα</h1></div>
+    <span class="edition">Φάρος Ακρωτηρίου <span>Πρώτο demo</span></span>
+  </header>
+  <section class="island" aria-label="Εξερεύνηση του φάρου">
+    <div class="scene-art">
+    <img class="landscape" src="/lighthouse.png" alt="Πέτρινος φάρος πάνω σε βραχώδες νησί, ανάμεσα στο φυλάκιο και το μηχανοστάσιο. Η θάλασσα είναι ήρεμη και το φως σβηστό.">
+    <div class="opening"><p>Ο φάρος έσβησε.</p><span>Ας δούμε το μηχανοστάσιο.</span></div>
+    <button class="place archive" disabled><span class="pin"></span><span>Φυλάκιο<small>Στην επόμενη έκδοση</small></span></button>
+    <button class="place engine" id="open-engine" disabled><span class="pin"></span><span>Μηχανοστάσιο<small id="engine-label">Ερεύνησε</small></span></button>
+    <button class="place radio" disabled><span class="pin"></span><span>Ασύρματος<small>Στην επόμενη έκδοση</small></span></button>
+    <span class="lantern-label">Το φανάρι περιμένει τα τρία ευρήματα</span>
+    </div>
+  </section>
+  <footer class="journal" aria-label="Ευρήματα αποστολής">
+    <div class="journal-title"><span>Το σημειωματάριό σου</span><small id="progress">0 από 3 ευρήματα</small></div>
+    <div class="finding empty"><span class="evidence-symbol">⌖</span><span>Στίγμα<small>Δεν βρέθηκε ακόμη</small></span></div>
+    <div class="finding empty" id="power-finding"><span class="evidence-symbol">ϟ</span><span>Τροφοδοσία<small id="power-value">Δεν βρέθηκε ακόμη</small></span></div>
+    <div class="finding empty"><span class="evidence-symbol">≈</span><span>Μήνυμα<small>Δεν βρέθηκε ακόμη</small></span></div>
+  </footer>
+  <p id="connection" class="connection" role="status">Σύνδεση με τον φάρο…</p>
+  <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
+</main>
+<dialog id="engine-dialog" aria-labelledby="room-title">
+  <div class="room-heading"><div><span class="brand">Δωμάτιο μηχανών</span><h2 id="room-title">Λίγη ζωή ακόμη.</h2></div><button id="close-engine" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button></div>
+  <div class="room-body">
+    <aside class="keeper-note"><span class="paper-clip" aria-hidden="true"></span><h3>Για την επανεκκίνηση</h3><p>Η βαλβίδα πρώτα.</p><p>Μετά, η αντλία.<br>Τελευταία, η γεννήτρια.</p><span class="note-signature">Ο φαροφύλακας</span></aside>
+    <section class="console" aria-label="Χειριστήρια μηχανοστασίου">
+      <div class="console-top"><span>Τροφοδοσία φάρου</span><span class="running-light" id="running-light">Εκτός λειτουργίας</span></div>
+      <div class="mechanisms">
+        <button class="mechanism" data-action="start-generator" disabled><span class="instrument generator-symbol" aria-hidden="true"><span></span></span><span>Γεννήτρια</span><small>Εκκίνηση</small></button>
+        <button class="mechanism" data-action="prime-pump" disabled><span class="instrument pump-symbol" aria-hidden="true"><span></span></span><span>Αντλία</span><small>Πλήρωση</small></button>
+        <button class="mechanism" data-action="open-valve" disabled><span class="instrument valve-symbol" aria-hidden="true"><span></span></span><span>Βαλβίδα</span><small>Άνοιγμα</small></button>
+      </div>
+      <div class="console-bottom"><span class="signal-lights" id="signal-lights" aria-label="Κανένας μηχανισμός ενεργός"><i></i><i></i><i></i></span><span id="power-display">— V</span></div>
+    </section>
+  </div>
+  <div class="room-footer"><p id="feedback" role="status" aria-live="polite">Διάβασε το σημείωμα και δοκίμασε τους μηχανισμούς.</p><button id="room-reconnect" class="text-button" hidden>Δοκίμασε ξανά</button><button id="return-island" class="return-button" hidden>Πίσω στον φάρο</button></div>
+</dialog>
+</body>
+</html>
