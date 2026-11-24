@@ -24,15 +24,33 @@
     <button class="place radio" disabled><span class="pin"></span><span>Ασύρματος<small>Στην επόμενη έκδοση</small></span></button>
     <span class="lantern-label">Το φανάρι περιμένει τα τρία ευρήματα</span>
     </div>
+    <section id="lobby" class="lobby" aria-labelledby="lobby-title" hidden>
+      <h2 id="lobby-title">Έναρξη βάρδιας</h2>
+      <form id="guest-form">
+        <label for="guest-name">Προσωρινό όνομα</label>
+        <input id="guest-name" name="name" maxlength="24" autocomplete="off" required>
+        <label for="guest-code">Κωδικός υπάρχοντος δωματίου <small>(προαιρετικό)</small></label>
+        <input id="guest-code" name="code" maxlength="8" pattern="[0-9A-Fa-f]{8}" autocapitalize="characters"
+               autocomplete="off" spellcheck="false">
+        <button id="enter-room" class="return-button" type="submit">Δημιούργησε δωμάτιο</button>
+        <p id="lobby-feedback" role="status"></p>
+      </form>
+    </section>
   </section>
   <footer class="journal" aria-label="Ευρήματα αποστολής">
-    <div class="journal-title"><span>Το σημειωματάριό σου</span><small id="progress">0 από 3 ευρήματα</small></div>
+    <div class="journal-title"><span>Σημειωματάριο ομάδας</span><small id="progress">0 από 3 ευρήματα</small></div>
     <div class="finding empty"><span class="evidence-symbol">⌖</span><span>Στίγμα<small>Δεν βρέθηκε ακόμη</small></span></div>
     <div class="finding empty" id="power-finding"><span class="evidence-symbol">ϟ</span><span>Τροφοδοσία<small id="power-value">Δεν βρέθηκε ακόμη</small></span></div>
     <div class="finding empty"><span class="evidence-symbol">≈</span><span>Μήνυμα<small>Δεν βρέθηκε ακόμη</small></span></div>
   </footer>
-  <p id="connection" class="connection" role="status">Σύνδεση με τον φάρο…</p>
-  <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
+  <div class="shift-status">
+    <div id="room-details" class="room-details" hidden>
+      <p>Κωδικός δωματίου <strong id="room-code"></strong></p>
+      <p id="room-players" role="status"></p>
+    </div>
+    <p id="connection" class="connection" role="status">Σύνδεση με τον φάρο…</p>
+    <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
+  </div>
 </main>
 <dialog id="engine-dialog" aria-labelledby="room-title">
   <div class="room-heading"><div><span class="brand">Δωμάτιο μηχανών</span><h2 id="room-title">Λίγη ζωή ακόμη.</h2></div><button id="close-engine" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button></div>
