@@ -1,0 +1,8 @@
+**
+!Dockerfile
+!pom.xml
+!checkstyle.xml
+!.mvn/
+!.mvn/maven.config
+!src/
+!src/**

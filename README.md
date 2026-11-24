@@ -3,6 +3,28 @@
 Συνεργατικό point-and-click μυστήριο σε απομονωμένο φάρο.
 Εξερευνήστε τρεις διαδρομές, συνδυάστε τα ευρήματα και ανάψτε ξανά το φως.
 
+## Εκτέλεση με Docker
+
+Με εγκατεστημένο Docker, τρέξε το δημόσιο image του demo από το GitHub Container Registry. Η λήψη γίνεται χωρίς σύνδεση στο GitHub.
+
+```sh
+docker run --rm --pull always -p 127.0.0.1:8080:8080 ghcr.io/panteliszara/escapehub:latest
+```
+
+Εναλλακτικά, από τον φάκελο που περιέχει το `compose.yaml`:
+
+```sh
+docker compose up --pull always
+```
+
+Άνοιξε `http://127.0.0.1:8080`. Για να δοκιμάσεις δεύτερο παίκτη στον ίδιο υπολογιστή, άνοιξε `http://localhost:8080` και χρησιμοποίησε τον ίδιο κωδικό δωματίου. Τερμάτισε την εκτέλεση με `Ctrl+C`. Το image περιέχει τη Java και τα αρχεία του παιχνιδιού. Το demo λειτουργεί χωρίς βάση δεδομένων και διατηρεί την πρόοδο στη μνήμη του container.
+
+Το CI δημοσιεύει το `latest` από το `main`. Για συγκεκριμένη έκδοση, αντικατάστησε το `latest` με το δημοσιευμένο tag της ή όρισε το αντίστοιχο image μέσω του `ESCAPEHUB_IMAGE` στο Compose. Αν η πόρτα 8080 χρησιμοποιείται ήδη, όρισε άλλη με `ESCAPEHUB_PORT=8081 docker compose up --pull always` και άνοιξε την ίδια πόρτα στον browser.
+
+Το CI δημοσιεύει image για `linux/amd64`. Σε ARM με διαθέσιμη εξομοίωση, πρόσθεσε `--platform linux/amd64` στο `docker run` ή όρισε `DOCKER_DEFAULT_PLATFORM=linux/amd64` πριν το `docker compose up`.
+
+## Ανάπτυξη χωρίς Docker
+
 Java 21. Build, tests και static analysis:
 
 ```sh

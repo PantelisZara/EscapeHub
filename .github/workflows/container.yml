@@ -1,0 +1,105 @@
+name: Container
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: container-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build container image
+        id: image
+        run: |
+          revision=$(git rev-parse HEAD)
+          tag=latest
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag="$GITHUB_REF_NAME"
+            [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+            git merge-base --is-ancestor "$revision" origin/main
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          docker build --tag escapehub:ci \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$revision" \
+            --label "org.opencontainers.image.version=$tag" .
+
+      - name: Smoke test the image with Compose
+        env:
+          ESCAPEHUB_IMAGE: escapehub:ci
+        run: |
+          trap 'docker compose logs --no-color; docker compose down' EXIT
+          docker compose up -d --pull never
+          origin=http://127.0.0.1:${ESCAPEHUB_PORT:-8080}
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 1 --max-time 5 \
+            "$origin/" --output "$RUNNER_TEMP/escapehub.html"
+          grep -Fq 'Το τελευταίο σήμα' "$RUNNER_TEMP/escapehub.html"
+          curl --fail --silent --show-error --max-time 5 --header "Origin: $origin" \
+            --data 'name=Container+check' "$origin/api/room" | grep -F '"players":["Container check"]'
+
+      - name: Export verified image
+        if: github.event_name == 'push'
+        run: docker image save --output "$RUNNER_TEMP/escapehub.tar" escapehub:ci
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push'
+        with:
+          name: escapehub-image
+          path: ${{ runner.temp }}/escapehub.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publish-ghcr
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: escapehub-image
+          path: ${{ runner.temp }}
+
+      - name: Sign in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish and verify the image
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          docker image load --input "$RUNNER_TEMP/escapehub.tar"
+          target="ghcr.io/${GITHUB_REPOSITORY,,}:$IMAGE_TAG"
+          image_id=$(docker image inspect --format '{{.Id}}' escapehub:ci)
+          docker image tag escapehub:ci "$target"
+          docker image push "$target"
+          docker image rm "$target"
+          docker image pull "$target"
+          test "$(docker image inspect --format '{{.Id}}' "$target")" = "$image_id"
