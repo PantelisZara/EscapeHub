@@ -27,6 +27,7 @@ class DemoServerTest {
     private static final String ENGINE = "/api/engine-room";
     private static final String ROOM = "/api/room";
     private static final String LANTERN = "/api/lantern";
+    private static final String ACCOUNTS = "/api/accounts";
     private static final Pattern COMPLETION =
             Pattern.compile("\"completion\":\\{\"completedAt\":\"([^\"]+)\",\"durationSeconds\":(\\d+)\\}");
     private DemoServer server;
@@ -337,9 +338,27 @@ class DemoServerTest {
     }
 
     @Test
+    void registersUniqueAccountsAndRejectsInvalidOrDuplicateRequests() throws Exception {
+        String encodedUser = URLEncoder.encode("Θάνος", StandardCharsets.UTF_8);
+        HttpResponse<String> created = post(player, ACCOUNTS, "username=" + encodedUser + "&password=Password123");
+        assertEquals(201, created.statusCode());
+        assertEquals("{\"username\":\"Θάνος\"}", created.body());
+        assertFalse(created.body().contains("Password123"));
+
+        HttpResponse<String> duplicate = post(player, ACCOUNTS,
+                "username=" + URLEncoder.encode("θάνος", StandardCharsets.UTF_8) + "&password=OtherPass123");
+        assertEquals(409, duplicate.statusCode());
+
+        assertEquals(400, post(player, ACCOUNTS, "username=ab&password=Password123").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser&password=short").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser&password=Password123&extra=1").statusCode());
+    }
+
+    @Test
     void rejectsCrossOriginAndWrongMethodRequests() throws Exception {
         enter(player, "Άννα", "");
-        for (String path : List.of(ROOM, ENGINE)) {
+        for (String path : List.of(ROOM, ENGINE, ACCOUNTS)) {
             URI uri = URI.create(server.url() + path);
             HttpRequest crossOrigin = HttpRequest.newBuilder(uri).header("Origin", "https://other.example")
                     .POST(HttpRequest.BodyPublishers.ofString("name=Guest")).build();

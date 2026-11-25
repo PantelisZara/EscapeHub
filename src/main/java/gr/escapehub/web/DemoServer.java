@@ -2,6 +2,7 @@ package gr.escapehub.web;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import gr.escapehub.account.AccountRegistry;
 import gr.escapehub.mission.ArchivePuzzle;
 import gr.escapehub.mission.MissionProgress;
 import gr.escapehub.mission.RadioPuzzle;
@@ -47,6 +48,7 @@ public final class DemoServer implements AutoCloseable {
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Room> rooms = new HashMap<>();
     private final Map<String, Session> sessions = new HashMap<>();
+    private final AccountRegistry accounts = new AccountRegistry();
 
     public DemoServer(int port) throws IOException {
         this("127.0.0.1", port);
@@ -96,6 +98,8 @@ public final class DemoServer implements AutoCloseable {
             String method = exchange.getRequestMethod();
             if (path.equals("/api/room")) {
                 enterRoom(exchange, method);
+            } else if (path.equals("/api/accounts")) {
+                registerAccount(exchange, method);
             } else if (path.equals("/api/engine-room")) {
                 engineRoom(exchange, method);
             } else if (path.equals("/api/radio")) {
@@ -127,6 +131,31 @@ public final class DemoServer implements AutoCloseable {
                 respond(exchange, 404, "text/plain", "Not found");
             }
         }
+    }
+
+    private void registerAccount(HttpExchange exchange, String method) throws IOException {
+        if (!method.equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        Map<String, String> form = readForm(exchange);
+        if (form == null) {
+            return;
+        }
+        if (!form.keySet().equals(Set.of("username", "password"))) {
+            respond(exchange, 400, "text/plain", "Username and password required");
+            return;
+        }
+        AccountRegistry.RegistrationResult result = accounts.register(form.get("username"), form.get("password"));
+        if (!result.created()) {
+            switch (result.error()) {
+                case DUPLICATE_USERNAME -> respond(exchange, 409, "text/plain", "Username already exists");
+                case INVALID_USERNAME -> respond(exchange, 400, "text/plain", "Invalid username");
+                case INVALID_PASSWORD -> respond(exchange, 400, "text/plain", "Invalid password");
+            }
+            return;
+        }
+        respond(exchange, 201, "application/json", "{\"username\":" + Room.quote(result.account().username()) + "}");
     }
 
     private void enterRoom(HttpExchange exchange, String method) throws IOException {
