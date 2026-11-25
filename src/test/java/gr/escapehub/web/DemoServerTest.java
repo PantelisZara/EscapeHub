@@ -323,6 +323,30 @@ class DemoServerTest {
     }
 
     @Test
+    void simultaneousFindingsFromSeparatePathsAreSharedWithBothPlayers() throws Exception {
+        String code = roomCode(enter(player, "Άννα", ""));
+        try (HttpClient other = newPlayer()) {
+            assertEquals(200, enter(other, "Μάνος", code).statusCode());
+            assertProgress(act(player, "open-valve", 0), 1, false);
+            assertProgress(act(player, "prime-pump", 1), 2, false);
+            solvePath(player, other, "radio");
+            assertTrue(get(other, ENGINE).body().contains("\"location\":null,\"lanternReady\":false"));
+
+            var power = player.sendAsync(formRequest(ENGINE, "action=start-generator&revision=2"),
+                    HttpResponse.BodyHandlers.ofString());
+            var location = other.sendAsync(formRequest("/api/archive", "marker=B"),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, power.get().statusCode());
+            assertEquals(200, location.get().statusCode());
+
+            var shared = get(player, ENGINE);
+            assertProgress(shared, 3, true);
+            assertTrue(shared.body().contains("\"location\":\"36.3577023, 25.3571183\",\"lanternReady\":true"));
+            assertEquals(shared.body(), get(other, ENGINE).body());
+        }
+    }
+
+    @Test
     void cannotSubmitWithoutASessionOrInventACompletion() throws Exception {
         assertEquals(401, act(player, "open-valve", 0).statusCode());
         assertEquals(400, enter(player, "  ", "").statusCode());
