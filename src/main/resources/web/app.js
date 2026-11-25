@@ -102,7 +102,7 @@ function render() {
   });
   document.querySelectorAll('#signal-lights i').forEach((light, index) => light.classList.toggle('on', index < steps));
   document.querySelector('#signal-lights').setAttribute('aria-label', `${steps} από 3 μηχανισμούς ενεργοί`);
-  writeText(document.querySelector('#engine-label'), solved ? 'Επανεκκίνηση ολοκληρώθηκε' : 'Ερεύνησε');
+  writeText(document.querySelector('#engine-label'), solved ? 'Έτοιμο' : 'Ερεύνησε');
   document.querySelector('#power-finding').classList.toggle('empty', !solved);
   writeText(document.querySelector('#power-value'), solved ? `${state.power} V` : 'Δεν βρέθηκε ακόμη');
   writeText(document.querySelector('#power-display'), solved ? `${state.power} V` : '— V');
@@ -111,10 +111,10 @@ function render() {
   writeText(document.querySelector('#progress'), `${Number(solved) + Number(!!message) + Number(!!location)} από 3 ευρήματα`);
   document.querySelector('#location-finding').classList.toggle('empty', !location);
   writeText(document.querySelector('#location-value'), location ?? 'Δεν βρέθηκε ακόμη');
-  writeText(document.querySelector('#archive-label'), location ? 'Στίγμα επιβεβαιώθηκε' : 'Ερεύνησε');
+  writeText(document.querySelector('#archive-label'), location ? 'Στίγμα βρέθηκε' : 'Ερεύνησε');
   document.querySelector('#message-finding').classList.toggle('empty', !message);
   writeText(document.querySelector('#message-value'), message ?? 'Δεν βρέθηκε ακόμη');
-  writeText(document.querySelector('#radio-label'), message ? 'Μήνυμα αποκωδικοποιήθηκε' : 'Ερεύνησε');
+  writeText(document.querySelector('#radio-label'), message ? 'Μήνυμα βρέθηκε' : 'Ερεύνησε');
   renderRadio();
   renderArchive();
   renderLantern();
@@ -147,7 +147,7 @@ function renderLantern() {
   lanternControls.disabled = !online || !ready || busy || lit;
   lanternControls.hidden = lit;
   lanternReconnect.hidden = online;
-  writeText(document.querySelector('#lantern-label'), lit ? 'Αναμμένο' : ready ? 'Έτοιμο για έλεγχο' : 'Χρειάζεται 3 ευρήματα');
+  writeText(document.querySelector('#lantern-label'), lit ? 'Αναμμένο' : ready ? 'Έτοιμο' : 'Κλειδωμένο');
   writeText(document.querySelector('#lighthouse-status'), lit ? 'Ο φάρος άναψε!' : 'Ο φάρος έσβησε.');
   writeText(document.querySelector('#lighthouse-hint'), lit ? 'Το σήμα μεταδόθηκε.'
     : ready ? 'Χρησιμοποίησε τα τρία ευρήματα στο φανάρι.' : 'Ας δούμε το μηχανοστάσιο.');

@@ -24,6 +24,8 @@ docker compose up --pull always
 
 Το CI δημοσιεύει image για `linux/amd64`. Σε ARM με διαθέσιμη εξομοίωση, πρόσθεσε `--platform linux/amd64` στο `docker run` ή όρισε `DOCKER_DEFAULT_PLATFORM=linux/amd64` πριν το `docker compose up`.
 
+Στο κάτω δεξί μέρος του παιχνιδιού εμφανίζονται η έκδοση και το commit του build. Τα images από το `main` εμφανίζουν την έκδοση του Maven και τα images έκδοσης εμφανίζουν την έκδοση του tag.
+
 ## Ανάπτυξη χωρίς Docker
 
 Java 21. Build, tests και static analysis:
@@ -31,12 +33,12 @@ Java 21. Build, tests και static analysis:
 Για linux:
 ```sh
 mkdir -p .cache/tmp
-MAVEN_USER_HOME="$PWD/.cache/maven-user-home" TMPDIR="$PWD/.cache/tmp" ./mvnw verify
+MAVEN_USER_HOME="$PWD/.cache/maven-user-home" TMPDIR="$PWD/.cache/tmp" ./mvnw "-Descapehub.build.revision=$(git rev-parse HEAD)" verify
 ```
 Για windows:
 ```sh
 mkdir -p .cache/tmp
-.\mvnw.cmd verify
+.\mvnw.cmd "-Descapehub.build.revision=$(git rev-parse HEAD)" verify
 ```
 
 Τοπικό demo:
@@ -54,6 +56,8 @@ java "-Djava.io.tmpdir=.cache/tmp" -cp target/classes gr.escapehub.web.DemoServe
 Κάθε δωμάτιο χωρά δύο παίκτες. Η ανανέωση της σελίδας διατηρεί τη συμμετοχή στο ίδιο προφίλ και URL. Τα δωμάτια και η πρόοδος χάνονται με την επανεκκίνηση του τοπικού server.
 
 Το φυλάκιο στο demo λειτουργεί χωρίς σύνδεση στις δημόσιες πηγές. Οι συντεταγμένες του προέρχονται από το επαληθευμένο snapshot. [Πηγές του φυλακίου](docs/snapshots/README.md)
+
+Για δοκιμή της ζωντανής ανάκτησης, όρισε `ESCAPEHUB_LIVE_ARCHIVE=true` πριν εκκινήσεις τον server ή πέρασέ το με `-e ESCAPEHUB_LIVE_ARCHIVE=true` στο `docker run`. Σε αυτή τη λειτουργία ο server ανακτά μία φορά κατά την εκκίνηση τις συντεταγμένες από το Wikidata και τις περνά στο Nominatim. Αν η ανάκτηση αποτύχει, η εκκίνηση αναφέρει το σφάλμα.
 
 #### Demo API
 

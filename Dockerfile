@@ -3,7 +3,12 @@ WORKDIR /build
 COPY pom.xml checkstyle.xml ./
 COPY .mvn/maven.config .mvn/maven.config
 COPY src/ src/
-RUN mkdir -p .cache/tmp && mvn -B verify
+ARG BUILD_REVISION=άγνωστο
+ARG BUILD_VERSION
+RUN mkdir -p .cache/tmp && \
+    set -- "-Descapehub.build.revision=$BUILD_REVISION" && \
+    if [ -n "$BUILD_VERSION" ]; then set -- "$@" "-Descapehub.build.version=$BUILD_VERSION"; fi && \
+    mvn -B "$@" verify
 
 FROM eclipse-temurin:21-jre-noble@sha256:54999a956a8bf8be9af0052790a6a832bf91a62fad3199fd194c3cc28057fc62
 WORKDIR /opt/escapehub

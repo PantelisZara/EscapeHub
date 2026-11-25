@@ -35,14 +35,19 @@ jobs:
         id: image
         run: |
           revision=$(git rev-parse HEAD)
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
           tag=latest
+          version=
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             tag="$GITHUB_REF_NAME"
             [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
             git merge-base --is-ancestor "$revision" origin/main
+            version=${tag#v}
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           docker build --tag escapehub:ci \
+            --build-arg "BUILD_REVISION=$revision" \
+            --build-arg "BUILD_VERSION=$version" \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$revision" \
             --label "org.opencontainers.image.version=$tag" .
@@ -50,6 +55,8 @@ jobs:
       - name: Smoke test the image with Compose
         env:
           ESCAPEHUB_IMAGE: escapehub:ci
+          BUILD_REVISION: ${{ steps.image.outputs.revision }}
+          BUILD_TAG: ${{ steps.image.outputs.tag }}
         run: |
           trap 'docker compose logs --no-color; docker compose down' EXIT
           docker compose up -d --pull never
@@ -57,6 +64,10 @@ jobs:
           curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 1 --max-time 5 \
             "$origin/" --output "$RUNNER_TEMP/escapehub.html"
           grep -Fq 'Το τελευταίο σήμα' "$RUNNER_TEMP/escapehub.html"
+          grep -Fq "Commit <code>$BUILD_REVISION</code>" "$RUNNER_TEMP/escapehub.html"
+          if [[ "$BUILD_TAG" != latest ]]; then
+            grep -Fq "Έκδοση ${BUILD_TAG#v} ·" "$RUNNER_TEMP/escapehub.html"
+          fi
           curl --fail --silent --show-error --max-time 5 --header "Origin: $origin" \
             --data 'name=Container+check' "$origin/api/room" | grep -F '"players":["Container check"]'
 

@@ -21,7 +21,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -55,27 +54,17 @@ public final class DemoServer implements AutoCloseable {
     private final AccountRegistry accounts;
 
     public DemoServer(int port) throws IOException {
-        this("127.0.0.1", port, accountFile());
+        this(port, accountFile());
     }
 
     DemoServer(int port, Path accountFile) throws IOException {
-        this("127.0.0.1", port, accountFile);
+        this("127.0.0.1", port, ArchiveCoordinates.snapshot(), accountFile);
     }
 
-    private DemoServer(String bindAddress, int port, Path accountFile) throws IOException {
+    private DemoServer(String bindAddress, int port, ArchiveCoordinates coordinates, Path accountFile) throws IOException {
         accounts = new AccountRegistry(accountFile);
-        Properties snapshot = new Properties();
-        try (var resource = DemoServer.class.getResourceAsStream("/data/akrotiri-lighthouse.properties")) {
-            if (resource == null) {
-                throw new IOException("Missing lighthouse snapshot");
-            }
-            snapshot.load(resource);
-        }
-        archiveClue = snapshot.getProperty("archive.coordinates");
-        lighthouseLocation = snapshot.getProperty("map.coordinates");
-        if (archiveClue == null || lighthouseLocation == null) {
-            throw new IOException("Incomplete lighthouse snapshot");
-        }
+        archiveClue = coordinates.archive();
+        lighthouseLocation = coordinates.map();
         server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
         server.setExecutor(executor);
         server.createContext("/", this::handle);
@@ -95,7 +84,10 @@ public final class DemoServer implements AutoCloseable {
 
     public static void main(String[] args) throws IOException {
         String bindAddress = System.getenv().getOrDefault("ESCAPEHUB_BIND_ADDRESS", "127.0.0.1");
-        DemoServer demo = new DemoServer(bindAddress, args.length == 0 ? 8080 : Integer.parseInt(args[0]), accountFile());
+        boolean liveArchive = Boolean.parseBoolean(System.getenv("ESCAPEHUB_LIVE_ARCHIVE"));
+        ArchiveCoordinates coordinates = liveArchive ? ArchiveCoordinates.live() : ArchiveCoordinates.snapshot();
+        DemoServer demo = new DemoServer(bindAddress, args.length == 0 ? 8080 : Integer.parseInt(args[0]),
+                coordinates, accountFile());
         Runtime.getRuntime().addShutdownHook(new Thread(demo::close));
         demo.start();
         System.out.println("EscapeHub: " + demo.url());
