@@ -21,7 +21,7 @@
     <div class="opening"><p>Ο φάρος έσβησε.</p><span>Ας δούμε το μηχανοστάσιο.</span></div>
     <button class="place archive" disabled><span class="pin"></span><span>Φυλάκιο<small>Στην επόμενη έκδοση</small></span></button>
     <button class="place engine" id="open-engine" disabled><span class="pin"></span><span>Μηχανοστάσιο<small id="engine-label">Ερεύνησε</small></span></button>
-    <button class="place radio" disabled><span class="pin"></span><span>Ασύρματος<small>Στην επόμενη έκδοση</small></span></button>
+    <button class="place radio" id="open-radio" disabled><span class="pin"></span><span>Ασύρματος<small id="radio-label">Ερεύνησε</small></span></button>
     <span class="lantern-label">Το φανάρι περιμένει τα τρία ευρήματα</span>
     </div>
     <section id="lobby" class="lobby" aria-labelledby="lobby-title" hidden>
@@ -41,7 +41,7 @@
     <div class="journal-title"><span>Σημειωματάριο ομάδας</span><small id="progress">0 από 3 ευρήματα</small></div>
     <div class="finding empty"><span class="evidence-symbol">⌖</span><span>Στίγμα<small>Δεν βρέθηκε ακόμη</small></span></div>
     <div class="finding empty" id="power-finding"><span class="evidence-symbol">ϟ</span><span>Τροφοδοσία<small id="power-value">Δεν βρέθηκε ακόμη</small></span></div>
-    <div class="finding empty"><span class="evidence-symbol">≈</span><span>Μήνυμα<small>Δεν βρέθηκε ακόμη</small></span></div>
+    <div class="finding empty" id="message-finding"><span class="evidence-symbol">≈</span><span>Μήνυμα<small id="message-value">Δεν βρέθηκε ακόμη</small></span></div>
   </footer>
   <div class="shift-status">
     <div id="room-details" class="room-details" hidden>
@@ -67,6 +67,27 @@
     </section>
   </div>
   <div class="room-footer"><p id="feedback" role="status" aria-live="polite">Διάβασε το σημείωμα και δοκίμασε τους μηχανισμούς.</p><button id="room-reconnect" class="text-button" hidden>Δοκίμασε ξανά</button><button id="return-island" class="return-button" hidden>Πίσω στον φάρο</button></div>
+</dialog>
+<dialog id="radio-dialog" aria-labelledby="radio-title">
+  <div class="room-heading">
+    <h2 id="radio-title">Ασύρματος</h2>
+    <button id="close-radio" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button>
+  </div>
+  <div class="room-body">
+    <aside class="keeper-note">
+      <h3>Το σήμα σου</h3>
+      <p><strong id="radio-signal">—</strong></p>
+      <p>Πες το σήμα σου στον συμπαίκτη σου. Ο καθένας καταχωρίζει το σήμα του άλλου.</p>
+    </aside>
+    <form id="radio-form" class="console radio-form">
+      <label for="partner-signal">Σήμα συμπαίκτη</label>
+      <input id="partner-signal" name="signal" maxlength="6" pattern="[0-9A-Fa-f]{6}"
+             autocapitalize="characters" autocomplete="off" spellcheck="false" required disabled>
+      <button id="submit-signal" class="return-button" type="submit" disabled>Επιβεβαίωσε το σήμα</button>
+      <p id="radio-feedback" role="status">Σύνδεση με τον ασύρματο…</p>
+      <button id="radio-reconnect" class="text-button" type="button" hidden>Δοκίμασε ξανά</button>
+    </form>
+  </div>
 </dialog>
 </body>
 </html>
