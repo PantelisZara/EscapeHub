@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DemoServerTest {
     private static final String ENGINE = "/api/engine-room";
     private static final String ROOM = "/api/room";
+    private static final String LANTERN = "/api/lantern";
     private DemoServer server;
     private HttpClient player;
 
@@ -200,6 +201,53 @@ class DemoServerTest {
             assertTrue(get(partner, ENGINE).body().contains("\"location\":\"36.3577023, 25.3571183\""));
             assertTrue(get(otherRoom, ENGINE).body().contains("\"location\":null"));
             assertProgress(get(player, ENGINE), 0, false);
+        }
+    }
+
+    @Test
+    void lanternRequiresAllThreeFindingsAndSharesCompletionInEitherOrder() throws Exception {
+        String answer = "location=36.3577023%2C25.3571183&power=240&message="
+                + URLEncoder.encode("Τρεις σύντομες αναλαμπές", StandardCharsets.UTF_8);
+        assertEquals(401, post(player, LANTERN, answer).statusCode());
+        var orders = List.of(List.of("archive", "engine", "radio"), List.of("radio", "archive", "engine"));
+        for (var order : orders) {
+            try (HttpClient first = newPlayer(); HttpClient partner = newPlayer()) {
+                String code = roomCode(enter(first, "Alex", ""));
+                assertEquals(200, enter(partner, "Dana", code).statusCode());
+                for (String path : order) {
+                    var early = post(first, LANTERN, answer);
+                    assertEquals(409, early.statusCode());
+                    assertTrue(early.body().contains("\"lanternReady\":false,\"lanternLit\":false"));
+                    solvePath(first, partner, path);
+                }
+                var ready = get(partner, ENGINE).body();
+                assertTrue(ready.contains("\"power\":240,\"message\":\"Τρεις σύντομες αναλαμπές\","
+                        + "\"location\":\"36.3577023, 25.3571183\""));
+                assertTrue(ready.contains("\"lanternReady\":true,\"lanternLit\":false"));
+                assertEquals(400, post(first, LANTERN, "power=240").statusCode());
+                var wrong = post(first, LANTERN, answer.replace("power=240", "power=241"));
+                assertEquals(422, wrong.statusCode());
+                assertTrue(wrong.body().contains("\"lanternLit\":false"));
+                assertEquals(200, post(first, LANTERN, answer).statusCode());
+                assertEquals(200, post(partner, LANTERN, answer).statusCode());
+                assertTrue(get(partner, ENGINE).body().contains("\"lanternLit\":true"));
+            }
+        }
+    }
+
+    private void solvePath(HttpClient first, HttpClient partner, String path) throws Exception {
+        switch (path) {
+            case "archive" -> assertEquals(200, post(first, "/api/archive", "marker=B").statusCode());
+            case "engine" -> {
+                assertProgress(act(first, "open-valve", 0), 1, false);
+                assertProgress(act(first, "prime-pump", 1), 2, false);
+                assertProgress(act(first, "start-generator", 2), 3, true);
+            }
+            case "radio" -> {
+                assertEquals(200, post(first, "/api/radio", "signal=" + radioSignal(partner)).statusCode());
+                assertEquals(200, post(partner, "/api/radio", "signal=" + radioSignal(first)).statusCode());
+            }
+            default -> throw new AssertionError("Unknown path " + path);
         }
     }
 

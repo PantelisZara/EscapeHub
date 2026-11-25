@@ -15,6 +15,13 @@ const roomCode = document.querySelector('#room-code');
 const roomPlayers = document.querySelector('#room-players');
 const order = ['open-valve', 'prime-pump', 'start-generator'];
 const enginePath = '/api/engine-room';
+const lighthouseGlow = document.querySelector('#lighthouse-glow');
+const lantern = document.querySelector('#lantern-dialog');
+const openLantern = document.querySelector('#open-lantern');
+const closeLantern = document.querySelector('#close-lantern');
+const lanternForm = document.querySelector('#lantern-form');
+const lanternControls = document.querySelector('#lantern-controls');
+const lanternReconnect = document.querySelector('#lantern-reconnect');
 const archivePath = '/api/archive';
 const archive = document.querySelector('#archive-dialog');
 const openArchive = document.querySelector('#open-archive');
@@ -34,6 +41,7 @@ const radioReconnect = document.querySelector('#radio-reconnect');
 let state = null;
 let archiveClue = null;
 let archiveWrong = false;
+let lanternWrong = false;
 let radioState = null;
 let radioWrong = false;
 let checked = false;
@@ -44,6 +52,13 @@ let pendingRefresh = null;
 openRoom.addEventListener('click', () => room.showModal());
 document.querySelector('#close-engine').addEventListener('click', () => room.close());
 document.querySelector('#return-island').addEventListener('click', () => room.close());
+openLantern.addEventListener('click', () => lantern.showModal());
+closeLantern.addEventListener('click', () => lantern.close());
+lanternReconnect.addEventListener('click', refresh);
+lanternForm.addEventListener('input', () => {
+  lanternWrong = false;
+  renderLantern();
+});
 openArchive.addEventListener('click', () => {
   archive.showModal();
   refresh();
@@ -100,10 +115,33 @@ function render() {
   writeText(document.querySelector('#radio-label'), message ? 'Μήνυμα αποκωδικοποιήθηκε' : 'Ερεύνησε');
   renderRadio();
   renderArchive();
+  renderLantern();
   const running = document.querySelector('#running-light');
   writeText(running, solved ? 'Σε λειτουργία' : 'Εκτός λειτουργίας');
   running.classList.toggle('on', solved);
   document.querySelector('#return-island').hidden = !solved;
+}
+
+function renderLantern() {
+  const ready = !!state?.lanternReady;
+  const lit = !!state?.lanternLit;
+  openLantern.disabled = !online || !ready;
+  openLantern.classList.toggle('lit', lit);
+  lighthouseGlow.classList.toggle('lit', lit);
+  lanternControls.disabled = !online || !ready || busy || lit;
+  lanternControls.hidden = lit;
+  lanternReconnect.hidden = online;
+  writeText(document.querySelector('#lantern-label'), lit ? 'Αναμμένο' : ready ? 'Έτοιμο για έλεγχο' : 'Χρειάζεται 3 ευρήματα');
+  writeText(document.querySelector('#lighthouse-status'), lit ? 'Ο φάρος άναψε!' : 'Ο φάρος έσβησε.');
+  writeText(document.querySelector('#lighthouse-hint'), lit ? 'Το σήμα μεταδόθηκε.'
+    : ready ? 'Χρησιμοποίησε τα τρία ευρήματα στο φανάρι.' : 'Ας δούμε το μηχανοστάσιο.');
+  writeText(document.querySelector('#lantern-location'), state?.location ?? '');
+  writeText(document.querySelector('#lantern-power'), state?.power ? `${state.power} V` : '');
+  writeText(document.querySelector('#lantern-message'), state?.message ?? '');
+  writeText(document.querySelector('#lantern-feedback'), !online ? 'Χάθηκε η σύνδεση με το φανάρι.'
+    : lit ? 'Ο φάρος άναψε! Το σήμα μεταδόθηκε.'
+    : lanternWrong ? 'Κάποιο εύρημα δεν ταιριάζει. Έλεγξε το σημειωματάριο και δοκίμασε ξανά.'
+    : 'Χρησιμοποίησε τα τρία ευρήματα της ομάδας.');
 }
 
 function renderArchive() {
@@ -171,6 +209,8 @@ function showMissingRoom() {
   state = null;
   archiveClue = null;
   archiveWrong = false;
+  lanternWrong = false;
+  lanternForm.reset();
   archiveMarker.length = 1;
   archiveMap.replaceChildren();
   archiveMap.hidden = true;
@@ -179,6 +219,7 @@ function showMissingRoom() {
   partnerSignal.value = '';
   checked = true;
   if (room.open) room.close();
+  if (lantern.open) lantern.close();
   if (archive.open) archive.close();
   if (radio.open) radio.close();
   showConnection(true, lostRoom ? 'Η βάρδια έληξε. Δημιούργησε δωμάτιο ή μπες σε ένα υπάρχον.' : '');
@@ -243,6 +284,36 @@ async function loadState() {
     showDisconnected();
   }
 }
+
+lanternForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (lanternControls.disabled) return;
+  const findings = new FormData(lanternForm);
+  busy = true;
+  render();
+  try {
+    await pendingRefresh;
+    if (!online || !state?.lanternReady || state.lanternLit) return;
+    const response = await postForm('/api/lantern', findings);
+    if (response.status === 401) {
+      showMissingRoom();
+      return;
+    }
+    if (!response.ok && response.status !== 409 && response.status !== 422) throw new Error(`HTTP ${response.status}`);
+    lanternWrong = response.status === 422;
+    acceptState(await response.json());
+  } catch {
+    showDisconnected();
+  } finally {
+    busy = false;
+    render();
+    if (lantern.open) {
+      if (!online) lanternReconnect.focus();
+      else if (state?.lanternLit) closeLantern.focus();
+      else document.querySelector('#final-location').focus();
+    }
+  }
+});
 
 document.querySelector('#archive-form').addEventListener('submit', async event => {
   event.preventDefault();

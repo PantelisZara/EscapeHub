@@ -29,6 +29,7 @@ public final class DemoServer implements AutoCloseable {
     private static final int MAX_ROOMS = 64;
     private static final int MAX_PLAYERS = 2;
     private static final int MAX_FORM_BYTES = 512;
+    private static final String GENERATOR_POWER = "240";
     private static final List<String> MECHANISMS = List.of("open-valve", "prime-pump", "start-generator");
     private static final String LIGHTHOUSE_MARKER = "B";
     private static final Set<String> ARCHIVE_MARKERS = Set.of("A", LIGHTHOUSE_MARKER, "C");
@@ -99,6 +100,8 @@ public final class DemoServer implements AutoCloseable {
                 radio(exchange, method);
             } else if (path.equals("/api/archive")) {
                 archive(exchange, method);
+            } else if (path.equals("/api/lantern")) {
+                lantern(exchange, method);
             } else if (ASSETS.containsKey(path)) {
                 if (!method.equals("GET")) {
                     methodNotAllowed(exchange, "GET");
@@ -289,6 +292,29 @@ public final class DemoServer implements AutoCloseable {
         respond(exchange, result.status(), "application/json", result.body());
     }
 
+    private void lantern(HttpExchange exchange, String method) throws IOException {
+        if (!method.equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        Session guest = session(exchange);
+        if (guest == null) {
+            respond(exchange, 401, "text/plain", "Join a room before playing");
+            return;
+        }
+        Map<String, String> form = readForm(exchange);
+        if (form == null) {
+            return;
+        }
+        if (!form.keySet().equals(Set.of("location", "power", "message"))
+                || form.values().stream().anyMatch(String::isBlank)) {
+            respond(exchange, 400, "text/plain", "Three findings required");
+            return;
+        }
+        ActionResult result = guest.room().lightLantern(form);
+        respond(exchange, result.status(), "application/json", result.body());
+    }
+
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {
         String host = exchange.getRequestHeaders().getFirst("Host");
         String origin = "http://" + host;
@@ -362,11 +388,13 @@ public final class DemoServer implements AutoCloseable {
         private final String code;
         private final List<String> players = new ArrayList<>(MAX_PLAYERS);
         private final MissionProgress progress = new MissionProgress(List.of("archive", "engine-room", "radio"));
-        private final SequentialPuzzle puzzle = new SequentialPuzzle(progress, "engine-room", MECHANISMS, "power:240");
+        private final SequentialPuzzle puzzle = new SequentialPuzzle(
+                progress, "engine-room", MECHANISMS, "power:" + GENERATOR_POWER);
         private final ArchivePuzzle archive = new ArchivePuzzle(progress, LIGHTHOUSE_MARKER);
         private final RadioPuzzle radio;
         private final String lighthouseLocation;
         private long revision;
+        private boolean lanternLit;
 
         Room(String code, String firstSignal, String secondSignal, String lighthouseLocation) {
             this.code = code;
@@ -395,6 +423,19 @@ public final class DemoServer implements AutoCloseable {
             return new ActionResult(accepted ? 200 : 422, snapshot());
         }
 
+        synchronized ActionResult lightLantern(Map<String, String> findings) {
+            if (!progress.finalPuzzleAvailable()) {
+                return new ActionResult(409, snapshot());
+            }
+            String location = findings.get("location").strip().replaceAll("\\s*,\\s*", ", ");
+            if (!lighthouseLocation.equals(location) || !GENERATOR_POWER.equals(findings.get("power").strip())
+                    || !radio.message().equalsIgnoreCase(findings.get("message").strip())) {
+                return new ActionResult(422, snapshot());
+            }
+            lanternLit = true;
+            return new ActionResult(200, snapshot());
+        }
+
         synchronized String radioSnapshot(int seat) {
             RadioPuzzle.View view = radio.view(seat);
             return String.format(Locale.ROOT,
@@ -421,9 +462,11 @@ public final class DemoServer implements AutoCloseable {
             String names = players.stream().map(Room::quote).collect(Collectors.joining(","));
             return String.format(Locale.ROOT,
                     "{\"code\":\"%s\",\"players\":[%s],\"revision\":%d,\"steps\":%d,\"solved\":%s,"
-                            + "\"power\":%s,\"message\":%s,\"location\":%s}",
-                    code, names, revision, puzzle.completedSteps(), solved, solved ? "240" : "null",
-                    quote(radio.message()), quote(archive.solved() ? lighthouseLocation : null));
+                            + "\"power\":%s,\"message\":%s,\"location\":%s,"
+                            + "\"lanternReady\":%s,\"lanternLit\":%s}",
+                    code, names, revision, puzzle.completedSteps(), solved, solved ? GENERATOR_POWER : "null",
+                    quote(radio.message()), quote(archive.solved() ? lighthouseLocation : null),
+                    progress.finalPuzzleAvailable(), lanternLit);
         }
 
         private static String quote(String text) {
