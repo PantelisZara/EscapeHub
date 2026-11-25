@@ -17,12 +17,13 @@
   </header>
   <section class="island" aria-label="Εξερεύνηση του φάρου">
     <div class="scene-art">
-    <img class="landscape" src="/lighthouse.png" alt="Πέτρινος φάρος πάνω σε βραχώδες νησί, ανάμεσα στο φυλάκιο και το μηχανοστάσιο. Η θάλασσα είναι ήρεμη και το φως σβηστό.">
-    <div class="opening"><p>Ο φάρος έσβησε.</p><span>Ας δούμε το μηχανοστάσιο.</span></div>
+    <img class="landscape" src="/lighthouse.png" alt="Πέτρινος φάρος πάνω σε βραχώδες νησί, ανάμεσα στο φυλάκιο και το μηχανοστάσιο.">
+    <span id="lighthouse-glow" class="lighthouse-glow" aria-hidden="true"></span>
+    <div class="opening"><p id="lighthouse-status" role="status">Ο φάρος έσβησε.</p><span id="lighthouse-hint">Ας δούμε το μηχανοστάσιο.</span></div>
     <button class="place archive" id="open-archive" disabled><span class="pin"></span><span>Φυλάκιο<small id="archive-label">Ερεύνησε</small></span></button>
     <button class="place engine" id="open-engine" disabled><span class="pin"></span><span>Μηχανοστάσιο<small id="engine-label">Ερεύνησε</small></span></button>
     <button class="place radio" id="open-radio" disabled><span class="pin"></span><span>Ασύρματος<small id="radio-label">Ερεύνησε</small></span></button>
-    <span class="lantern-label">Το φανάρι περιμένει τα τρία ευρήματα</span>
+    <button class="place lantern" id="open-lantern" disabled><span class="pin"></span><span>Φανάρι<small id="lantern-label">Χρειάζεται 3 ευρήματα</small></span></button>
     </div>
     <section id="lobby" class="lobby" aria-labelledby="lobby-title" hidden>
       <h2 id="lobby-title">Έναρξη βάρδιας</h2>
@@ -52,6 +53,33 @@
     <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
   </div>
 </main>
+<dialog id="lantern-dialog" aria-labelledby="lantern-title">
+  <div class="room-heading">
+    <h2 id="lantern-title">Φανάρι</h2>
+    <button id="close-lantern" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button>
+  </div>
+  <div class="room-body">
+    <aside class="keeper-note">
+      <h3>Σημειωματάριο ομάδας</h3>
+      <p id="lantern-location"></p>
+      <p id="lantern-power"></p>
+      <p id="lantern-message"></p>
+    </aside>
+    <form id="lantern-form" class="console lantern-form">
+      <fieldset id="lantern-controls" disabled>
+        <label for="final-location">Στίγμα</label>
+        <input id="final-location" name="location" maxlength="32" autocomplete="off" required>
+        <label for="final-power">Τροφοδοσία (V)</label>
+        <input id="final-power" name="power" inputmode="numeric" maxlength="5" autocomplete="off" required>
+        <label for="final-message">Μήνυμα ασυρμάτου</label>
+        <input id="final-message" name="message" maxlength="64" autocomplete="off" required>
+        <button class="return-button" type="submit">Άναψε τον φάρο</button>
+      </fieldset>
+      <p id="lantern-feedback" role="status"></p>
+      <button id="lantern-reconnect" class="text-button" type="button" hidden>Δοκίμασε ξανά</button>
+    </form>
+  </div>
+</dialog>
 <dialog id="archive-dialog" aria-labelledby="archive-title">
   <div class="room-heading">
     <h2 id="archive-title">Φυλάκιο</h2>
