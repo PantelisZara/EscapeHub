@@ -87,8 +87,14 @@ h1 { font-size:38px; }
 .evidence-symbol { width:30px; font-family:var(--display); font-size:29px; text-align:center; }
 .shift-status { margin:0 clamp(25px, 5vw, 48px); padding-bottom:20px; }
 .room-details:not([hidden]) { display:flex; gap:4px 20px; flex-wrap:wrap; margin-bottom:5px; font-size:16px; overflow-wrap:anywhere; }
-.radio-form { display:grid; gap:12px; justify-items:start; }
+.radio-form, .archive-form { display:grid; gap:12px; justify-items:start; }
 .radio-form input { width:100%; max-width:12ch; padding:8px 10px; font:inherit; background:#142733; color:var(--ink); border:1px solid #718692; }
+.archive-form select { max-width:100%; padding:8px 10px; font:inherit; background:#142733; color:var(--ink); border:1px solid #718692; }
+.archive-map { width:100%; height:110px; position:relative; border:1px solid #718692; background:#142733; }
+.archive-map::before { content:'↑ Β'; position:absolute; top:4px; right:8px; }
+.archive-map span { position:absolute; transform:translate(-50%, -50%); border:1px solid #718692; border-radius:50%; min-width:24px; text-align:center; }
+.archive-map .selected { background:var(--paper); color:#142733; }
+.archive-form a, .keeper-note a { color:inherit; }
 #room-code { color:var(--brass); letter-spacing:.11em; }
 .connection { font-size:14px; color:var(--muted); }
 .connection.error { color:#f1c08c; }

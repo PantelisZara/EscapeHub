@@ -15,6 +15,14 @@ const roomCode = document.querySelector('#room-code');
 const roomPlayers = document.querySelector('#room-players');
 const order = ['open-valve', 'prime-pump', 'start-generator'];
 const enginePath = '/api/engine-room';
+const archivePath = '/api/archive';
+const archive = document.querySelector('#archive-dialog');
+const openArchive = document.querySelector('#open-archive');
+const closeArchive = document.querySelector('#close-archive');
+const archiveMarker = document.querySelector('#archive-marker');
+const archiveMap = document.querySelector('#archive-map');
+const submitMarker = document.querySelector('#submit-marker');
+const archiveReconnect = document.querySelector('#archive-reconnect');
 const radioPath = '/api/radio';
 const radio = document.querySelector('#radio-dialog');
 const openRadio = document.querySelector('#open-radio');
@@ -24,6 +32,8 @@ const submitSignal = document.querySelector('#submit-signal');
 const radioReconnect = document.querySelector('#radio-reconnect');
 
 let state = null;
+let archiveClue = null;
+let archiveWrong = false;
 let radioState = null;
 let radioWrong = false;
 let checked = false;
@@ -34,6 +44,16 @@ let pendingRefresh = null;
 openRoom.addEventListener('click', () => room.showModal());
 document.querySelector('#close-engine').addEventListener('click', () => room.close());
 document.querySelector('#return-island').addEventListener('click', () => room.close());
+openArchive.addEventListener('click', () => {
+  archive.showModal();
+  refresh();
+});
+closeArchive.addEventListener('click', () => archive.close());
+archiveReconnect.addEventListener('click', refresh);
+archiveMarker.addEventListener('change', () => {
+  archiveWrong = false;
+  renderArchive();
+});
 openRadio.addEventListener('click', () => {
   radio.showModal();
   refresh();
@@ -50,6 +70,7 @@ function render() {
   roomDetails.hidden = !state;
   enterRoom.disabled = busy;
   openRoom.disabled = !online || !state;
+  openArchive.disabled = !online || !state;
   openRadio.disabled = !online || !state;
   if (state) {
     writeText(roomCode, state.code);
@@ -69,15 +90,56 @@ function render() {
   writeText(document.querySelector('#power-value'), solved ? `${state.power} V` : 'Δεν βρέθηκε ακόμη');
   writeText(document.querySelector('#power-display'), solved ? `${state.power} V` : '— V');
   const message = state?.message;
-  writeText(document.querySelector('#progress'), `${Number(solved) + Number(!!message)} από 3 ευρήματα`);
+  const location = state?.location;
+  writeText(document.querySelector('#progress'), `${Number(solved) + Number(!!message) + Number(!!location)} από 3 ευρήματα`);
+  document.querySelector('#location-finding').classList.toggle('empty', !location);
+  writeText(document.querySelector('#location-value'), location ?? 'Δεν βρέθηκε ακόμη');
+  writeText(document.querySelector('#archive-label'), location ? 'Στίγμα επιβεβαιώθηκε' : 'Ερεύνησε');
   document.querySelector('#message-finding').classList.toggle('empty', !message);
   writeText(document.querySelector('#message-value'), message ?? 'Δεν βρέθηκε ακόμη');
   writeText(document.querySelector('#radio-label'), message ? 'Μήνυμα αποκωδικοποιήθηκε' : 'Ερεύνησε');
   renderRadio();
+  renderArchive();
   const running = document.querySelector('#running-light');
   writeText(running, solved ? 'Σε λειτουργία' : 'Εκτός λειτουργίας');
   running.classList.toggle('on', solved);
   document.querySelector('#return-island').hidden = !solved;
+}
+
+function renderArchive() {
+  const canSubmit = online && !busy && !!archiveClue && !state?.location;
+  archiveMarker.disabled = !canSubmit;
+  submitMarker.disabled = !canSubmit;
+  archiveReconnect.hidden = online;
+  for (const point of archiveMap.children) {
+    point.classList.toggle('selected', point.textContent === archiveMarker.value);
+  }
+  writeText(document.querySelector('#archive-coordinates'), archiveClue?.coordinates ?? '—');
+  writeText(document.querySelector('#archive-feedback'), !online ? 'Χάθηκε η σύνδεση με το φυλάκιο.'
+    : state?.location ? `Το στίγμα ${state.location} καταγράφηκε στο κοινό σημειωματάριο.`
+    : !archiveClue ? 'Φόρτωση του χάρτη…'
+    : archiveWrong ? 'Αυτό το σημείο δεν ταιριάζει. Σύγκρινε ξανά τις συντεταγμένες.'
+    : 'Τα σημεία περιλαμβάνουν δύο δοκιμαστικές θέσεις.');
+}
+
+function showArchiveMarkers(markers) {
+  const points = Object.entries(markers).map(([marker, coordinates]) => {
+    const [latitude, longitude] = coordinates.split(',').map(Number);
+    return { marker, coordinates, latitude, longitude };
+  });
+  const north = Math.max(...points.map(point => point.latitude));
+  const west = Math.min(...points.map(point => point.longitude));
+  const latitudeSpan = north - Math.min(...points.map(point => point.latitude));
+  const longitudeSpan = Math.max(...points.map(point => point.longitude)) - west;
+  for (const { marker, coordinates, latitude, longitude } of points) {
+    archiveMarker.add(new Option(`${marker} · ${coordinates}`, marker));
+    const point = document.createElement('span');
+    point.textContent = marker;
+    point.style.top = `${20 + 60 * (north - latitude) / latitudeSpan}%`;
+    point.style.left = `${14 + 72 * (longitude - west) / longitudeSpan}%`;
+    archiveMap.append(point);
+  }
+  archiveMap.hidden = false;
 }
 
 function renderRadio() {
@@ -107,11 +169,17 @@ function showConnection(connected, message) {
 function showMissingRoom() {
   const lostRoom = !!state;
   state = null;
+  archiveClue = null;
+  archiveWrong = false;
+  archiveMarker.length = 1;
+  archiveMap.replaceChildren();
+  archiveMap.hidden = true;
   radioState = null;
   radioWrong = false;
   partnerSignal.value = '';
   checked = true;
   if (room.open) room.close();
+  if (archive.open) archive.close();
   if (radio.open) radio.close();
   showConnection(true, lostRoom ? 'Η βάρδια έληξε. Δημιούργησε δωμάτιο ή μπες σε ένα υπάρχον.' : '');
   if (lostRoom) writeText(lobbyFeedback, 'Η προηγούμενη βάρδια έληξε.');
@@ -157,6 +225,17 @@ async function loadState() {
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     acceptState(await response.json());
+    if (archive.open && !archiveClue) {
+      const clue = await fetch(archivePath, { signal: AbortSignal.timeout(6000) });
+      if (clue.status === 401) {
+        showMissingRoom();
+        return;
+      }
+      if (!clue.ok) throw new Error(`HTTP ${clue.status}`);
+      archiveClue = await clue.json();
+      showArchiveMarkers(archiveClue.markers);
+      renderArchive();
+    }
     if (radio.open) {
       await acceptRadio(await fetch(radioPath, { signal: AbortSignal.timeout(6000) }));
     }
@@ -164,6 +243,36 @@ async function loadState() {
     showDisconnected();
   }
 }
+
+document.querySelector('#archive-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (submitMarker.disabled) return;
+  const marker = archiveMarker.value;
+  busy = true;
+  render();
+  try {
+    await pendingRefresh;
+    if (!state || !online || state.location) return;
+    const response = await postForm(archivePath, { marker });
+    if (response.status === 401) {
+      showMissingRoom();
+      return;
+    }
+    if (!response.ok && response.status !== 422) throw new Error(`HTTP ${response.status}`);
+    archiveWrong = response.status === 422;
+    acceptState(await response.json());
+  } catch {
+    showDisconnected();
+  } finally {
+    busy = false;
+    render();
+    if (archive.open) {
+      if (!online) archiveReconnect.focus();
+      else if (state?.location) closeArchive.focus();
+      else archiveMarker.focus();
+    }
+  }
+});
 
 async function acceptRadio(response) {
   if (response.status === 401) {
