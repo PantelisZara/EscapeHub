@@ -3,6 +3,7 @@ package gr.escapehub.web;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import gr.escapehub.mission.MissionProgress;
+import gr.escapehub.mission.RadioPuzzle;
 import gr.escapehub.mission.SequentialPuzzle;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -36,7 +37,7 @@ public final class DemoServer implements AutoCloseable {
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Room> rooms = new HashMap<>();
-    private final Map<String, Room> sessions = new HashMap<>();
+    private final Map<String, Session> sessions = new HashMap<>();
 
     public DemoServer(int port) throws IOException {
         this("127.0.0.1", port);
@@ -76,6 +77,8 @@ public final class DemoServer implements AutoCloseable {
                 enterRoom(exchange, method);
             } else if (path.equals("/api/engine-room")) {
                 engineRoom(exchange, method);
+            } else if (path.equals("/api/radio")) {
+                radio(exchange, method);
             } else if (ASSETS.containsKey(path)) {
                 if (!method.equals("GET")) {
                     methodNotAllowed(exchange, "GET");
@@ -131,8 +134,9 @@ public final class DemoServer implements AutoCloseable {
     }
 
     private synchronized Entry register(String sessionId, String name, String code) {
-        Room existing = sessions.get(sessionId);
-        if (existing != null) {
+        Session session = sessions.get(sessionId);
+        if (session != null) {
+            Room existing = session.room();
             if (!code.isEmpty() && !existing.code.equals(code)) {
                 return new Entry(409, null, null, "Already in a room");
             }
@@ -148,7 +152,12 @@ public final class DemoServer implements AutoCloseable {
             while (rooms.containsKey(newCode)) {
                 newCode = HexFormat.of().withUpperCase().toHexDigits(random.nextInt());
             }
-            room = new Room(newCode);
+            String firstSignal = newSignal();
+            String secondSignal = newSignal();
+            while (secondSignal.equals(firstSignal)) {
+                secondSignal = newSignal();
+            }
+            room = new Room(newCode, firstSignal, secondSignal);
             rooms.put(newCode, room);
         } else {
             room = rooms.get(code);
@@ -156,12 +165,21 @@ public final class DemoServer implements AutoCloseable {
                 return new Entry(404, null, null, "Room not found");
             }
         }
-        if (!room.addPlayer(name)) {
+        int seat = room.addPlayer(name);
+        if (seat < 0) {
             return new Entry(409, null, null, "Room full");
         }
         String id = UUID.randomUUID().toString();
-        sessions.put(id, room);
+        sessions.put(id, new Session(room, seat));
         return new Entry(code.isEmpty() ? 201 : 200, room, id, null);
+    }
+
+    private String newSignal() {
+        return HexFormat.of().withUpperCase().toHexDigits(random.nextInt(), 6);
+    }
+
+    private synchronized Session session(HttpExchange exchange) {
+        return sessions.get(cookieId(exchange));
     }
 
     private void engineRoom(HttpExchange exchange, String method) throws IOException {
@@ -169,14 +187,12 @@ public final class DemoServer implements AutoCloseable {
             methodNotAllowed(exchange, "GET, POST");
             return;
         }
-        Room room;
-        synchronized (this) {
-            room = sessions.get(cookieId(exchange));
-        }
-        if (room == null) {
+        Session guest = session(exchange);
+        if (guest == null) {
             respond(exchange, 401, "text/plain", "Join a room before playing");
             return;
         }
+        Room room = guest.room();
         if (method.equals("GET")) {
             respond(exchange, 200, "application/json", room.snapshot());
             return;
@@ -192,6 +208,33 @@ public final class DemoServer implements AutoCloseable {
             return;
         }
         ActionResult result = room.act(action, Long.parseLong(revision));
+        respond(exchange, result.status(), "application/json", result.body());
+    }
+
+    private void radio(HttpExchange exchange, String method) throws IOException {
+        if (!method.equals("GET") && !method.equals("POST")) {
+            methodNotAllowed(exchange, "GET, POST");
+            return;
+        }
+        Session guest = session(exchange);
+        if (guest == null) {
+            respond(exchange, 401, "text/plain", "Join a room before playing");
+            return;
+        }
+        if (method.equals("GET")) {
+            respond(exchange, 200, "application/json", guest.room().radioSnapshot(guest.seat()));
+            return;
+        }
+        Map<String, String> form = readForm(exchange);
+        if (form == null) {
+            return;
+        }
+        String signal = form.getOrDefault("signal", "").strip().toUpperCase(Locale.ROOT);
+        if (form.size() != 1 || !signal.matches("[0-9A-F]{6}")) {
+            respond(exchange, 400, "text/plain", "Invalid radio signal");
+            return;
+        }
+        ActionResult result = guest.room().confirmSignal(guest.seat(), signal);
         respond(exchange, result.status(), "application/json", result.body());
     }
 
@@ -260,6 +303,8 @@ public final class DemoServer implements AutoCloseable {
 
     private record Entry(int status, Room room, String sessionId, String message) { }
 
+    private record Session(Room room, int seat) { }
+
     private record ActionResult(int status, String body) { }
 
     private static final class Room {
@@ -267,18 +312,36 @@ public final class DemoServer implements AutoCloseable {
         private final List<String> players = new ArrayList<>(MAX_PLAYERS);
         private final MissionProgress progress = new MissionProgress(List.of("archive", "engine-room", "radio"));
         private final SequentialPuzzle puzzle = new SequentialPuzzle(progress, "engine-room", MECHANISMS, "power:240");
+        private final RadioPuzzle radio;
         private long revision;
 
-        Room(String code) {
+        Room(String code, String firstSignal, String secondSignal) {
             this.code = code;
+            radio = new RadioPuzzle(progress, firstSignal, secondSignal);
         }
 
-        synchronized boolean addPlayer(String name) {
+        synchronized int addPlayer(String name) {
             if (players.size() == MAX_PLAYERS) {
-                return false;
+                return -1;
             }
             players.add(name);
-            return true;
+            return players.size() - 1;
+        }
+
+        synchronized ActionResult confirmSignal(int seat, String signal) {
+            if (players.size() < MAX_PLAYERS) {
+                return new ActionResult(409, radioSnapshot(seat));
+            }
+            boolean accepted = radio.confirm(seat, signal);
+            return new ActionResult(accepted ? 200 : 422, radioSnapshot(seat));
+        }
+
+        synchronized String radioSnapshot(int seat) {
+            RadioPuzzle.View view = radio.view(seat);
+            return String.format(Locale.ROOT,
+                    "{\"signal\":\"%s\",\"ready\":%s,\"confirmed\":%s,\"partnerConfirmed\":%s,\"message\":%s}",
+                    view.signal(), players.size() == MAX_PLAYERS, view.confirmed(), view.partnerConfirmed(),
+                    quote(view.message()));
         }
 
         synchronized ActionResult act(String action, long expectedRevision) {
@@ -296,14 +359,16 @@ public final class DemoServer implements AutoCloseable {
 
         synchronized String snapshot() {
             boolean solved = progress.solvedPaths().contains("engine-room");
-            String names = players.stream().map(Room::quoteName).collect(Collectors.joining(","));
+            String names = players.stream().map(Room::quote).collect(Collectors.joining(","));
             return String.format(Locale.ROOT,
-                    "{\"code\":\"%s\",\"players\":[%s],\"revision\":%d,\"steps\":%d,\"solved\":%s,\"power\":%s}",
-                    code, names, revision, puzzle.completedSteps(), solved, solved ? "240" : "null");
+                    "{\"code\":\"%s\",\"players\":[%s],\"revision\":%d,\"steps\":%d,\"solved\":%s,"
+                            + "\"power\":%s,\"message\":%s}",
+                    code, names, revision, puzzle.completedSteps(), solved, solved ? "240" : "null",
+                    quote(radio.message()));
         }
 
-        private static String quoteName(String name) {
-            return "\"" + name.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        private static String quote(String text) {
+            return text == null ? "null" : "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         }
     }
 }

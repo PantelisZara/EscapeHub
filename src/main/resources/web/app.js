@@ -15,8 +15,17 @@ const roomCode = document.querySelector('#room-code');
 const roomPlayers = document.querySelector('#room-players');
 const order = ['open-valve', 'prime-pump', 'start-generator'];
 const enginePath = '/api/engine-room';
+const radioPath = '/api/radio';
+const radio = document.querySelector('#radio-dialog');
+const openRadio = document.querySelector('#open-radio');
+const radioForm = document.querySelector('#radio-form');
+const partnerSignal = document.querySelector('#partner-signal');
+const submitSignal = document.querySelector('#submit-signal');
+const radioReconnect = document.querySelector('#radio-reconnect');
 
 let state = null;
+let radioState = null;
+let radioWrong = false;
 let checked = false;
 let online = false;
 let busy = false;
@@ -25,6 +34,12 @@ let pendingRefresh = null;
 openRoom.addEventListener('click', () => room.showModal());
 document.querySelector('#close-engine').addEventListener('click', () => room.close());
 document.querySelector('#return-island').addEventListener('click', () => room.close());
+openRadio.addEventListener('click', () => {
+  radio.showModal();
+  refresh();
+});
+document.querySelector('#close-radio').addEventListener('click', () => radio.close());
+radioReconnect.addEventListener('click', refresh);
 
 function writeText(element, text) {
   if (element.textContent !== text) element.textContent = text;
@@ -35,6 +50,7 @@ function render() {
   roomDetails.hidden = !state;
   enterRoom.disabled = busy;
   openRoom.disabled = !online || !state;
+  openRadio.disabled = !online || !state;
   if (state) {
     writeText(roomCode, state.code);
     writeText(roomPlayers, `${state.players.length} από 2 παίκτες · ${state.players.join(' · ')}`);
@@ -52,11 +68,32 @@ function render() {
   document.querySelector('#power-finding').classList.toggle('empty', !solved);
   writeText(document.querySelector('#power-value'), solved ? `${state.power} V` : 'Δεν βρέθηκε ακόμη');
   writeText(document.querySelector('#power-display'), solved ? `${state.power} V` : '— V');
-  writeText(document.querySelector('#progress'), `${solved ? 1 : 0} από 3 ευρήματα`);
+  const message = state?.message;
+  writeText(document.querySelector('#progress'), `${Number(solved) + Number(!!message)} από 3 ευρήματα`);
+  document.querySelector('#message-finding').classList.toggle('empty', !message);
+  writeText(document.querySelector('#message-value'), message ?? 'Δεν βρέθηκε ακόμη');
+  writeText(document.querySelector('#radio-label'), message ? 'Μήνυμα αποκωδικοποιήθηκε' : 'Ερεύνησε');
+  renderRadio();
   const running = document.querySelector('#running-light');
   writeText(running, solved ? 'Σε λειτουργία' : 'Εκτός λειτουργίας');
   running.classList.toggle('on', solved);
   document.querySelector('#return-island').hidden = !solved;
+}
+
+function renderRadio() {
+  const canConfirm = online && !busy && radioState?.ready && !radioState.confirmed;
+  partnerSignal.disabled = !canConfirm;
+  submitSignal.disabled = !canConfirm;
+  radioReconnect.hidden = online;
+  writeText(document.querySelector('#radio-signal'), radioState?.signal ?? '—');
+  writeText(document.querySelector('#radio-feedback'), !online ? 'Χάθηκε η σύνδεση με τον ασύρματο.'
+    : !radioState ? 'Σύνδεση με τον ασύρματο…'
+    : radioState.message ? `Το μήνυμα αποκωδικοποιήθηκε. ${radioState.message}.`
+    : !radioState.ready ? 'Περιμένεις τον δεύτερο παίκτη.'
+    : radioState.confirmed ? 'Το σήμα επιβεβαιώθηκε. Περιμένεις τον συμπαίκτη σου.'
+    : radioWrong ? 'Το σήμα δεν ταιριάζει. Έλεγξε τους χαρακτήρες με τον συμπαίκτη σου.'
+    : radioState.partnerConfirmed ? 'Ο συμπαίκτης σου επιβεβαίωσε το σήμα. Είναι η σειρά σου.'
+    : 'Καταχώρισε το σήμα του συμπαίκτη σου.');
 }
 
 function showConnection(connected, message) {
@@ -70,8 +107,12 @@ function showConnection(connected, message) {
 function showMissingRoom() {
   const lostRoom = !!state;
   state = null;
+  radioState = null;
+  radioWrong = false;
+  partnerSignal.value = '';
   checked = true;
   if (room.open) room.close();
+  if (radio.open) radio.close();
   showConnection(true, lostRoom ? 'Η βάρδια έληξε. Δημιούργησε δωμάτιο ή μπες σε ένα υπάρχον.' : '');
   if (lostRoom) writeText(lobbyFeedback, 'Η προηγούμενη βάρδια έληξε.');
   render();
@@ -116,10 +157,52 @@ async function loadState() {
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     acceptState(await response.json());
+    if (radio.open) {
+      await acceptRadio(await fetch(radioPath, { signal: AbortSignal.timeout(6000) }));
+    }
   } catch {
     showDisconnected();
   }
 }
+
+async function acceptRadio(response) {
+  if (response.status === 401) {
+    showMissingRoom();
+    return;
+  }
+  if (!response.ok && response.status !== 409 && response.status !== 422) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  radioState = await response.json();
+  if (radioState.message) state.message = radioState.message;
+  render();
+}
+
+radioForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (submitSignal.disabled) return;
+  const signal = partnerSignal.value;
+  busy = true;
+  render();
+  try {
+    await pendingRefresh;
+    if (!state || !online) return;
+    const response = await postForm(radioPath, { signal });
+    radioWrong = response.status === 422;
+    await acceptRadio(response);
+    if (radioState?.confirmed) partnerSignal.value = '';
+  } catch {
+    showDisconnected();
+  } finally {
+    busy = false;
+    render();
+    if (radio.open) {
+      if (!online) radioReconnect.focus();
+      else if (!partnerSignal.disabled) partnerSignal.focus();
+      else document.querySelector('#close-radio').focus();
+    }
+  }
+});
 
 function refresh() {
   if (!busy && !pendingRefresh) {

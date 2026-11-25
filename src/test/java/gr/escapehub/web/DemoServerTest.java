@@ -145,6 +145,48 @@ class DemoServerTest {
     }
 
     @Test
+    void radioShowsPrivateSignalsAndRequiresBothSessions() throws Exception {
+        assertEquals(401, get(player, "/api/radio").statusCode());
+        assertEquals(401, post(player, "/api/radio", "signal=000000").statusCode());
+        String code = roomCode(enter(player, "Άννα", ""));
+        String firstSignal = radioSignal(player);
+        assertEquals(409, post(player, "/api/radio", "signal=" + firstSignal).statusCode());
+
+        try (HttpClient partner = newPlayer(); HttpClient outsider = newPlayer()) {
+            assertEquals(200, enter(partner, "Άννα", code).statusCode());
+            String secondSignal = radioSignal(partner);
+            assertFalse(firstSignal.equals(secondSignal));
+            assertFalse(get(player, "/api/radio").body().contains(secondSignal));
+            assertFalse(get(partner, "/api/radio").body().contains(firstSignal));
+            assertFalse(get(player, ENGINE).body().contains("\"signal\""));
+            assertEquals(422, post(player, "/api/radio", "signal=" + firstSignal).statusCode());
+            assertEquals(400, post(player, "/api/radio", "signal=" + secondSignal + "&seat=1").statusCode());
+
+            assertEquals(200, post(player, "/api/radio", "signal=" + secondSignal).statusCode());
+            assertEquals(200, post(player, "/api/radio", "signal=" + secondSignal).statusCode());
+            assertTrue(get(partner, "/api/radio").body().contains("\"partnerConfirmed\":true"));
+            assertTrue(get(player, ENGINE).body().contains("\"message\":null"));
+
+            assertEquals(200, post(partner, "/api/radio",
+                    "signal=" + firstSignal.toLowerCase(Locale.ROOT)).statusCode());
+            assertTrue(get(player, ENGINE).body().contains("\"message\":\"Τρεις σύντομες αναλαμπές\""));
+            assertEquals(get(player, ENGINE).body(), get(partner, ENGINE).body());
+            assertTrue(get(partner, "/api/radio").body().contains("\"confirmed\":true"));
+            assertProgress(get(player, ENGINE), 0, false);
+            assertEquals(201, enter(outsider, "Μάνος", "").statusCode());
+            assertTrue(get(outsider, ENGINE).body().contains("\"message\":null"));
+        }
+    }
+
+    private String radioSignal(HttpClient client) throws Exception {
+        HttpResponse<String> response = get(client, "/api/radio");
+        assertEquals(200, response.statusCode());
+        var match = java.util.regex.Pattern.compile("\"signal\":\"([0-9A-F]{6})\"").matcher(response.body());
+        assertTrue(match.find());
+        return match.group(1);
+    }
+
+    @Test
     void separateRoomsHaveSeparateProgressAndUnknownCodesAreRejected() throws Exception {
         assertEquals(404, enter(player, "Άννα", "DEADBEEF").statusCode());
         HttpResponse<String> first = enter(player, "Άννα", "");
