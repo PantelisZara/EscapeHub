@@ -27,12 +27,12 @@ docker compose up --pull always
 
 Java 21. Build, tests και static analysis:
 
-Για linux
+Για linux:
 ```sh
 mkdir -p .cache/tmp
 MAVEN_USER_HOME="$PWD/.cache/maven-user-home" TMPDIR="$PWD/.cache/tmp" ./mvnw verify
 ```
-Για windows
+Για windows:
 ```sh
 mkdir -p .cache/tmp
 .\mvnw.cmd verify
