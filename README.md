@@ -56,6 +56,8 @@ java "-Djava.io.tmpdir=.cache/tmp" -cp target/classes gr.escapehub.web.DemoServe
 
 Το φυλάκιο στο demo λειτουργεί χωρίς σύνδεση στις δημόσιες πηγές. Οι συντεταγμένες του προέρχονται από το επαληθευμένο snapshot. [Πηγές του φυλακίου](docs/snapshots/README.md)
 
+Για δοκιμή της ζωντανής ανάκτησης, όρισε `ESCAPEHUB_LIVE_ARCHIVE=true` πριν εκκινήσεις τον server ή πέρασέ το με `-e ESCAPEHUB_LIVE_ARCHIVE=true` στο `docker run`. Σε αυτή τη λειτουργία ο server ανακτά μία φορά κατά την εκκίνηση τις συντεταγμένες από το Wikidata και τις περνά στο Nominatim. Αν η ανάκτηση αποτύχει, η εκκίνηση αναφέρει το σφάλμα.
+
 #### Demo API
 
 - `POST /api/room` δέχεται form με `name` και προαιρετικό `code`. Η δημιουργία επιστρέφει `201`, η συμμετοχή `200` και ένα γεμάτο δωμάτιο `409`. Η συμμετοχή αποθηκεύεται σε HttpOnly cookie.
