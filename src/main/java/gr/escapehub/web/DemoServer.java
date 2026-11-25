@@ -433,7 +433,8 @@ public final class DemoServer implements AutoCloseable {
                 return new ActionResult(409, snapshot());
             }
             String location = findings.get("location").strip().replaceAll("\\s*,\\s*", ", ");
-            if (!lighthouseLocation.equals(location) || !GENERATOR_POWER.equals(findings.get("power").strip())
+            String power = findings.get("power").strip().replaceFirst("(?i)\\h*v$", "");
+            if (!lighthouseLocation.equals(location) || !GENERATOR_POWER.equals(power)
                     || !radio.message().equalsIgnoreCase(findings.get("message").strip())) {
                 return new ActionResult(422, snapshot());
             }

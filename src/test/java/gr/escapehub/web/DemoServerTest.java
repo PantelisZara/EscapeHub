@@ -231,11 +231,12 @@ class DemoServerTest {
                 assertTrue(ready.contains("\"lanternReady\":true,\"lanternLit\":false"));
                 assertTrue(ready.contains("\"completion\":null"));
                 assertEquals(400, post(first, LANTERN, "power=240").statusCode());
-                var wrong = post(first, LANTERN, answer.replace("power=240", "power=241"));
+                var wrong = post(first, LANTERN, answer.replace("power=240", "power=241V"));
                 assertEquals(422, wrong.statusCode());
                 assertTrue(wrong.body().contains("\"lanternLit\":false"));
                 assertTrue(wrong.body().contains("\"completion\":null"));
-                var solved = post(first, LANTERN, answer);
+                String formattedPower = order.getFirst().equals("archive") ? "240V" : "240+V";
+                var solved = post(first, LANTERN, answer.replace("power=240", "power=" + formattedPower));
                 assertEquals(200, solved.statusCode());
                 assertTrue(solved.body().contains("\"lanternLit\":true"));
                 var completion = COMPLETION.matcher(solved.body());
