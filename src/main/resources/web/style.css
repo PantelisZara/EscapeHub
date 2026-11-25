@@ -101,6 +101,7 @@ h1 { font-size:38px; }
 .finding.empty { color:#9cabb1; }
 .evidence-symbol { width:30px; font-family:var(--display); font-size:29px; text-align:center; }
 .shift-status { margin:0 clamp(25px, 5vw, 48px); padding-bottom:20px; }
+.build-info { margin-top:8px; text-align:right; overflow-wrap:anywhere; }
 .mission-completion:not(:empty) { margin-bottom:8px; color:var(--brass); font-variant-numeric:tabular-nums; }
 .room-details:not([hidden]) { display:flex; gap:4px 20px; flex-wrap:wrap; margin-bottom:5px; font-size:16px; overflow-wrap:anywhere; }
 .radio-form, .archive-form, .lantern-form, .lantern-form fieldset:not([hidden]) { display:grid; gap:12px; justify-items:start; }
