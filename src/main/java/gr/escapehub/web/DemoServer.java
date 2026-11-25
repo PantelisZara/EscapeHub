@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -384,6 +386,8 @@ public final class DemoServer implements AutoCloseable {
 
     private record ActionResult(int status, String body) { }
 
+    private record Completion(Instant completedAt, long durationSeconds) { }
+
     private static final class Room {
         private final String code;
         private final List<String> players = new ArrayList<>(MAX_PLAYERS);
@@ -393,8 +397,9 @@ public final class DemoServer implements AutoCloseable {
         private final ArchivePuzzle archive = new ArchivePuzzle(progress, LIGHTHOUSE_MARKER);
         private final RadioPuzzle radio;
         private final String lighthouseLocation;
+        private final long startedNanos = System.nanoTime();
         private long revision;
-        private boolean lanternLit;
+        private Completion completion;
 
         Room(String code, String firstSignal, String secondSignal, String lighthouseLocation) {
             this.code = code;
@@ -432,7 +437,10 @@ public final class DemoServer implements AutoCloseable {
                     || !radio.message().equalsIgnoreCase(findings.get("message").strip())) {
                 return new ActionResult(422, snapshot());
             }
-            lanternLit = true;
+            if (completion == null) {
+                long durationSeconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedNanos);
+                completion = new Completion(Instant.now(), durationSeconds);
+            }
             return new ActionResult(200, snapshot());
         }
 
@@ -460,13 +468,16 @@ public final class DemoServer implements AutoCloseable {
         synchronized String snapshot() {
             boolean solved = progress.solvedPaths().contains("engine-room");
             String names = players.stream().map(Room::quote).collect(Collectors.joining(","));
+            String completed = completion == null ? "null" : String.format(Locale.ROOT,
+                    "{\"completedAt\":%s,\"durationSeconds\":%d}",
+                    quote(completion.completedAt().toString()), completion.durationSeconds());
             return String.format(Locale.ROOT,
                     "{\"code\":\"%s\",\"players\":[%s],\"revision\":%d,\"steps\":%d,\"solved\":%s,"
                             + "\"power\":%s,\"message\":%s,\"location\":%s,"
-                            + "\"lanternReady\":%s,\"lanternLit\":%s}",
+                            + "\"lanternReady\":%s,\"lanternLit\":%s,\"completion\":%s}",
                     code, names, revision, puzzle.completedSteps(), solved, solved ? GENERATOR_POWER : "null",
                     quote(radio.message()), quote(archive.solved() ? lighthouseLocation : null),
-                    progress.finalPuzzleAvailable(), lanternLit);
+                    progress.finalPuzzleAvailable(), completion != null, completed);
         }
 
         private static String quote(String text) {

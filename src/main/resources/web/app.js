@@ -13,6 +13,8 @@ const lobbyFeedback = document.querySelector('#lobby-feedback');
 const roomDetails = document.querySelector('#room-details');
 const roomCode = document.querySelector('#room-code');
 const roomPlayers = document.querySelector('#room-players');
+const missionCompletion = document.querySelector('#mission-completion');
+const completionDate = new Intl.DateTimeFormat('el-GR', { dateStyle: 'medium', timeStyle: 'medium' });
 const order = ['open-valve', 'prime-pump', 'start-generator'];
 const enginePath = '/api/engine-room';
 const lighthouseGlow = document.querySelector('#lighthouse-glow');
@@ -116,10 +118,24 @@ function render() {
   renderRadio();
   renderArchive();
   renderLantern();
+  renderCompletion(state?.completion);
   const running = document.querySelector('#running-light');
   writeText(running, solved ? 'Σε λειτουργία' : 'Εκτός λειτουργίας');
   running.classList.toggle('on', solved);
   document.querySelector('#return-island').hidden = !solved;
+}
+
+function renderCompletion(completion) {
+  if (!completion) {
+    writeText(missionCompletion, '');
+    return;
+  }
+  const { completedAt, durationSeconds } = completion;
+  const hours = Math.floor(durationSeconds / 3600);
+  const minutes = Math.floor(durationSeconds / 60) % 60;
+  const seconds = durationSeconds % 60;
+  const duration = [hours, minutes, seconds].map(part => String(part).padStart(2, '0')).join(':');
+  writeText(missionCompletion, `Ολοκλήρωση βάρδιας ${completionDate.format(new Date(completedAt))} · Διάρκεια ${duration}`);
 }
 
 function renderLantern() {
