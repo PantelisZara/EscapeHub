@@ -10,8 +10,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,8 @@ class DemoServerTest {
     private static final String ENGINE = "/api/engine-room";
     private static final String ROOM = "/api/room";
     private static final String LANTERN = "/api/lantern";
+    private static final Pattern COMPLETION =
+            Pattern.compile("\"completion\":\\{\"completedAt\":\"([^\"]+)\",\"durationSeconds\":(\\d+)\\}");
     private DemoServer server;
     private HttpClient player;
 
@@ -71,7 +75,7 @@ class DemoServerTest {
     }
 
     private static String roomCode(HttpResponse<String> response) {
-        var match = java.util.regex.Pattern.compile("\"code\":\"([0-9A-F]{8})\"").matcher(response.body());
+        var match = Pattern.compile("\"code\":\"([0-9A-F]{8})\"").matcher(response.body());
         assertTrue(match.find());
         return match.group(1);
     }
@@ -212,6 +216,7 @@ class DemoServerTest {
         var orders = List.of(List.of("archive", "engine", "radio"), List.of("radio", "archive", "engine"));
         for (var order : orders) {
             try (HttpClient first = newPlayer(); HttpClient partner = newPlayer()) {
+                Instant beforeRoom = Instant.now();
                 String code = roomCode(enter(first, "Alex", ""));
                 assertEquals(200, enter(partner, "Dana", code).statusCode());
                 for (String path : order) {
@@ -224,13 +229,25 @@ class DemoServerTest {
                 assertTrue(ready.contains("\"power\":240,\"message\":\"Τρεις σύντομες αναλαμπές\","
                         + "\"location\":\"36.3577023, 25.3571183\""));
                 assertTrue(ready.contains("\"lanternReady\":true,\"lanternLit\":false"));
+                assertTrue(ready.contains("\"completion\":null"));
                 assertEquals(400, post(first, LANTERN, "power=240").statusCode());
-                var wrong = post(first, LANTERN, answer.replace("power=240", "power=241"));
+                var wrong = post(first, LANTERN, answer.replace("power=240", "power=241V"));
                 assertEquals(422, wrong.statusCode());
                 assertTrue(wrong.body().contains("\"lanternLit\":false"));
-                assertEquals(200, post(first, LANTERN, answer).statusCode());
-                assertEquals(200, post(partner, LANTERN, answer).statusCode());
-                assertTrue(get(partner, ENGINE).body().contains("\"lanternLit\":true"));
+                assertTrue(wrong.body().contains("\"completion\":null"));
+                String formattedPower = order.getFirst().equals("archive") ? "240V" : "240+V";
+                var solved = post(first, LANTERN, answer.replace("power=240", "power=" + formattedPower));
+                assertEquals(200, solved.statusCode());
+                assertTrue(solved.body().contains("\"lanternLit\":true"));
+                var completion = COMPLETION.matcher(solved.body());
+                assertTrue(completion.find(), solved.body());
+                Instant completedAt = Instant.parse(completion.group(1));
+                assertFalse(completedAt.isBefore(beforeRoom));
+                assertFalse(completedAt.isAfter(Instant.now()));
+                var retry = post(partner, LANTERN, answer);
+                assertEquals(200, retry.statusCode());
+                assertEquals(solved.body(), retry.body());
+                assertEquals(solved.body(), get(partner, ENGINE).body());
             }
         }
     }
