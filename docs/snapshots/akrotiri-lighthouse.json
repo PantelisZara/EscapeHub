@@ -1,0 +1,28 @@
+{
+  "wikidata": {
+    "retrievedAt": "2026-11-25T10:55:05Z",
+    "request": "https://www.wikidata.org/wiki/Special:EntityData/Q60750512.json",
+    "entityId": "Q60750512",
+    "revision": 1967673235,
+    "license": "CC0-1.0",
+    "name": "Akrotiri lighthouse",
+    "coordinates": {
+      "latitude": 36.35779,
+      "longitude": 25.35706
+    }
+  },
+  "openStreetMap": {
+    "retrievedAt": "2026-11-25T10:55:18Z",
+    "request": "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=36.35779&lon=25.35706&zoom=18&addressdetails=0&accept-language=en",
+    "feature": "https://www.openstreetmap.org/node/1446175116",
+    "license": "ODbL-1.0",
+    "attribution": "© OpenStreetMap contributors",
+    "category": "man_made",
+    "type": "lighthouse",
+    "name": "Cape Akrotiri Lighthouse",
+    "coordinates": {
+      "latitude": 36.3577023,
+      "longitude": 25.3571183
+    }
+  }
+}
