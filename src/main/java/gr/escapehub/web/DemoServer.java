@@ -2,6 +2,7 @@ package gr.escapehub.web;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import gr.escapehub.mission.ArchivePuzzle;
 import gr.escapehub.mission.MissionProgress;
 import gr.escapehub.mission.RadioPuzzle;
 import gr.escapehub.mission.SequentialPuzzle;
@@ -17,6 +18,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -28,12 +30,16 @@ public final class DemoServer implements AutoCloseable {
     private static final int MAX_PLAYERS = 2;
     private static final int MAX_FORM_BYTES = 512;
     private static final List<String> MECHANISMS = List.of("open-valve", "prime-pump", "start-generator");
+    private static final String LIGHTHOUSE_MARKER = "B";
+    private static final Set<String> ARCHIVE_MARKERS = Set.of("A", LIGHTHOUSE_MARKER, "C");
     private static final Map<String, String> ASSETS = Map.of(
             "/", "index.html", "/style.css", "style.css", "/app.js", "app.js",
             "/lighthouse.png", "lighthouse.png",
             "/fonts/GFSDidot-Regular.ttf", "fonts/GFSDidot-Regular.ttf",
             "/fonts/GFSNeohellenic.ttf", "fonts/GFSNeohellenic.ttf");
     private final HttpServer server;
+    private final String archiveClue;
+    private final String lighthouseLocation;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Room> rooms = new HashMap<>();
@@ -44,6 +50,18 @@ public final class DemoServer implements AutoCloseable {
     }
 
     private DemoServer(String bindAddress, int port) throws IOException {
+        Properties snapshot = new Properties();
+        try (var resource = DemoServer.class.getResourceAsStream("/data/akrotiri-lighthouse.properties")) {
+            if (resource == null) {
+                throw new IOException("Missing lighthouse snapshot");
+            }
+            snapshot.load(resource);
+        }
+        archiveClue = snapshot.getProperty("archive.coordinates");
+        lighthouseLocation = snapshot.getProperty("map.coordinates");
+        if (archiveClue == null || lighthouseLocation == null) {
+            throw new IOException("Incomplete lighthouse snapshot");
+        }
         server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
         server.setExecutor(executor);
         server.createContext("/", this::handle);
@@ -79,6 +97,8 @@ public final class DemoServer implements AutoCloseable {
                 engineRoom(exchange, method);
             } else if (path.equals("/api/radio")) {
                 radio(exchange, method);
+            } else if (path.equals("/api/archive")) {
+                archive(exchange, method);
             } else if (ASSETS.containsKey(path)) {
                 if (!method.equals("GET")) {
                     methodNotAllowed(exchange, "GET");
@@ -157,7 +177,7 @@ public final class DemoServer implements AutoCloseable {
             while (secondSignal.equals(firstSignal)) {
                 secondSignal = newSignal();
             }
-            room = new Room(newCode, firstSignal, secondSignal);
+            room = new Room(newCode, firstSignal, secondSignal, lighthouseLocation);
             rooms.put(newCode, room);
         } else {
             room = rooms.get(code);
@@ -238,6 +258,37 @@ public final class DemoServer implements AutoCloseable {
         respond(exchange, result.status(), "application/json", result.body());
     }
 
+    private void archive(HttpExchange exchange, String method) throws IOException {
+        if (!method.equals("GET") && !method.equals("POST")) {
+            methodNotAllowed(exchange, "GET, POST");
+            return;
+        }
+        Session guest = session(exchange);
+        if (guest == null) {
+            respond(exchange, 401, "text/plain", "Join a room before playing");
+            return;
+        }
+        if (method.equals("GET")) {
+            // A and C are fictional map markers. B comes from the verified OpenStreetMap record.
+            String clue = "{\"coordinates\":" + Room.quote(archiveClue) + ",\"markers\":{"
+                    + "\"A\":\"36.35926, 25.35524\",\"" + LIGHTHOUSE_MARKER + "\":"
+                    + Room.quote(lighthouseLocation) + ",\"C\":\"36.35588, 25.36039\"}}";
+            respond(exchange, 200, "application/json", clue);
+            return;
+        }
+        Map<String, String> form = readForm(exchange);
+        if (form == null) {
+            return;
+        }
+        String marker = form.getOrDefault("marker", "");
+        if (form.size() != 1 || !ARCHIVE_MARKERS.contains(marker)) {
+            respond(exchange, 400, "text/plain", "Invalid map marker");
+            return;
+        }
+        ActionResult result = guest.room().confirmMarker(marker);
+        respond(exchange, result.status(), "application/json", result.body());
+    }
+
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {
         String host = exchange.getRequestHeaders().getFirst("Host");
         String origin = "http://" + host;
@@ -312,11 +363,14 @@ public final class DemoServer implements AutoCloseable {
         private final List<String> players = new ArrayList<>(MAX_PLAYERS);
         private final MissionProgress progress = new MissionProgress(List.of("archive", "engine-room", "radio"));
         private final SequentialPuzzle puzzle = new SequentialPuzzle(progress, "engine-room", MECHANISMS, "power:240");
+        private final ArchivePuzzle archive = new ArchivePuzzle(progress, LIGHTHOUSE_MARKER);
         private final RadioPuzzle radio;
+        private final String lighthouseLocation;
         private long revision;
 
-        Room(String code, String firstSignal, String secondSignal) {
+        Room(String code, String firstSignal, String secondSignal, String lighthouseLocation) {
             this.code = code;
+            this.lighthouseLocation = lighthouseLocation;
             radio = new RadioPuzzle(progress, firstSignal, secondSignal);
         }
 
@@ -334,6 +388,11 @@ public final class DemoServer implements AutoCloseable {
             }
             boolean accepted = radio.confirm(seat, signal);
             return new ActionResult(accepted ? 200 : 422, radioSnapshot(seat));
+        }
+
+        synchronized ActionResult confirmMarker(String marker) {
+            boolean accepted = archive.solved() || archive.confirm(marker);
+            return new ActionResult(accepted ? 200 : 422, snapshot());
         }
 
         synchronized String radioSnapshot(int seat) {
@@ -362,9 +421,9 @@ public final class DemoServer implements AutoCloseable {
             String names = players.stream().map(Room::quote).collect(Collectors.joining(","));
             return String.format(Locale.ROOT,
                     "{\"code\":\"%s\",\"players\":[%s],\"revision\":%d,\"steps\":%d,\"solved\":%s,"
-                            + "\"power\":%s,\"message\":%s}",
+                            + "\"power\":%s,\"message\":%s,\"location\":%s}",
                     code, names, revision, puzzle.completedSteps(), solved, solved ? "240" : "null",
-                    quote(radio.message()));
+                    quote(radio.message()), quote(archive.solved() ? lighthouseLocation : null));
         }
 
         private static String quote(String text) {

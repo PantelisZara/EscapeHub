@@ -9,4 +9,6 @@
 
 Για χειροκίνητη επαλήθευση, κάλεσε πρώτα το `wikidata.request` του snapshot με περιγραφικό User-Agent όπως `EscapeHub/0.1 (https://github.com/PantelisZara/EscapeHub)`. Πέρασε τις τιμές `P625` στη δεύτερη κλήση σύμφωνα με το `openStreetMap.request`. Η [πολιτική του δημόσιου Nominatim](https://operations.osmfoundation.org/policies/nominatim/) ορίζει μέγιστο ρυθμό ενός αιτήματος ανά δευτερόλεπτο και απαιτεί αναγνωρίσιμο User-Agent και αναφορά προέλευσης.
 
-Τα επιλεγμένα πεδία του Wikidata καλύπτονται από [CC0](https://www.wikidata.org/wiki/Wikidata:Licensing). Τα επιλεγμένα πεδία του χάρτη καλύπτονται από [ODbL 1.0 · © OpenStreetMap contributors](https://www.openstreetmap.org/copyright). Όταν εμφανιστούν τα δεδομένα του χάρτη στο παιχνίδι, η οθόνη του γρίφου θα πρέπει να εμφανίζει την αναφορά προέλευσης με σύνδεσμο προς την άδεια.
+Ο server του demo διαβάζει μόνο τα δύο ζεύγη συντεταγμένων από το [απόσπασμα του snapshot](../../src/main/resources/data/akrotiri-lighthouse.properties), το οποίο συσκευάζεται στο JAR. Το JSON διατηρεί τα στοιχεία των κλήσεων για έλεγχο προέλευσης. Όταν ενημερωθεί το snapshot, ενημέρωσε και το απόσπασμα που χρησιμοποιεί το παιχνίδι.
+
+Τα επιλεγμένα πεδία του Wikidata καλύπτονται από [CC0](https://www.wikidata.org/wiki/Wikidata:Licensing). Η οθόνη του φυλακίου εμφανίζει την αναφορά προέλευσης του χάρτη με σύνδεσμο προς την άδεια. [ODbL 1.0 · © OpenStreetMap contributors](https://www.openstreetmap.org/copyright)

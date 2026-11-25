@@ -19,7 +19,7 @@
     <div class="scene-art">
     <img class="landscape" src="/lighthouse.png" alt="Πέτρινος φάρος πάνω σε βραχώδες νησί, ανάμεσα στο φυλάκιο και το μηχανοστάσιο. Η θάλασσα είναι ήρεμη και το φως σβηστό.">
     <div class="opening"><p>Ο φάρος έσβησε.</p><span>Ας δούμε το μηχανοστάσιο.</span></div>
-    <button class="place archive" disabled><span class="pin"></span><span>Φυλάκιο<small>Στην επόμενη έκδοση</small></span></button>
+    <button class="place archive" id="open-archive" disabled><span class="pin"></span><span>Φυλάκιο<small id="archive-label">Ερεύνησε</small></span></button>
     <button class="place engine" id="open-engine" disabled><span class="pin"></span><span>Μηχανοστάσιο<small id="engine-label">Ερεύνησε</small></span></button>
     <button class="place radio" id="open-radio" disabled><span class="pin"></span><span>Ασύρματος<small id="radio-label">Ερεύνησε</small></span></button>
     <span class="lantern-label">Το φανάρι περιμένει τα τρία ευρήματα</span>
@@ -39,7 +39,7 @@
   </section>
   <footer class="journal" aria-label="Ευρήματα αποστολής">
     <div class="journal-title"><span>Σημειωματάριο ομάδας</span><small id="progress">0 από 3 ευρήματα</small></div>
-    <div class="finding empty"><span class="evidence-symbol">⌖</span><span>Στίγμα<small>Δεν βρέθηκε ακόμη</small></span></div>
+    <div class="finding empty" id="location-finding"><span class="evidence-symbol">⌖</span><span>Στίγμα<small id="location-value">Δεν βρέθηκε ακόμη</small></span></div>
     <div class="finding empty" id="power-finding"><span class="evidence-symbol">ϟ</span><span>Τροφοδοσία<small id="power-value">Δεν βρέθηκε ακόμη</small></span></div>
     <div class="finding empty" id="message-finding"><span class="evidence-symbol">≈</span><span>Μήνυμα<small id="message-value">Δεν βρέθηκε ακόμη</small></span></div>
   </footer>
@@ -52,6 +52,31 @@
     <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
   </div>
 </main>
+<dialog id="archive-dialog" aria-labelledby="archive-title">
+  <div class="room-heading">
+    <h2 id="archive-title">Φυλάκιο</h2>
+    <button id="close-archive" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button>
+  </div>
+  <div class="room-body">
+    <aside class="keeper-note">
+      <h3>Αρχείο φάρου Ακρωτηρίου</h3>
+      <p><strong id="archive-coordinates">—</strong></p>
+      <p>Βρες ποιο σημείο του χάρτη είναι πιο κοντά στο στίγμα του αρχείου.</p>
+      <a href="https://www.wikidata.org/w/index.php?title=Q60750512&amp;oldid=1967673235" target="_blank" rel="noopener noreferrer">Εγγραφή Wikidata</a>
+    </aside>
+    <form id="archive-form" class="console archive-form">
+      <div id="archive-map" class="archive-map" aria-hidden="true" hidden></div>
+      <label for="archive-marker">Σημείο στον χάρτη</label>
+      <select id="archive-marker" name="marker" required disabled>
+        <option value="">Επίλεξε σημείο</option>
+      </select>
+      <button id="submit-marker" class="return-button" type="submit" disabled>Έλεγξε το στίγμα</button>
+      <p id="archive-feedback" role="status">Φόρτωση του χάρτη…</p>
+      <button id="archive-reconnect" class="text-button" type="button" hidden>Δοκίμασε ξανά</button>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a>
+    </form>
+  </div>
+</dialog>
 <dialog id="engine-dialog" aria-labelledby="room-title">
   <div class="room-heading"><div><span class="brand">Δωμάτιο μηχανών</span><h2 id="room-title">Λίγη ζωή ακόμη.</h2></div><button id="close-engine" class="close-button" aria-label="Επιστροφή στον φάρο">✕</button></div>
   <div class="room-body">

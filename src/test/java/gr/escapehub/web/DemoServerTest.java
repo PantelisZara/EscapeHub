@@ -178,6 +178,31 @@ class DemoServerTest {
         }
     }
 
+    @Test
+    void archivePublishesTheVerifiedLocationOnlyInTheSolvedRoom() throws Exception {
+        String archive = "/api/archive";
+        assertEquals(401, get(player, archive).statusCode());
+        assertEquals(401, post(player, archive, "marker=B").statusCode());
+        String code = roomCode(enter(player, "Alex", ""));
+        try (HttpClient partner = newPlayer(); HttpClient otherRoom = newPlayer()) {
+            assertEquals(200, enter(partner, "Dana", code).statusCode());
+            assertEquals(201, enter(otherRoom, "Sam", "").statusCode());
+            var clue = get(player, archive);
+            assertEquals(200, clue.statusCode());
+            assertTrue(clue.body().contains("\"coordinates\":\"36.35779, 25.35706\""));
+            assertTrue(clue.body().contains("\"B\":\"36.3577023, 25.3571183\""));
+            assertEquals(400, post(player, archive, "marker=D").statusCode());
+            assertEquals(422, post(player, archive, "marker=A").statusCode());
+            assertTrue(get(partner, ENGINE).body().contains("\"location\":null"));
+
+            assertEquals(200, post(player, archive, "marker=B").statusCode());
+            assertEquals(200, post(partner, archive, "marker=B").statusCode());
+            assertTrue(get(partner, ENGINE).body().contains("\"location\":\"36.3577023, 25.3571183\""));
+            assertTrue(get(otherRoom, ENGINE).body().contains("\"location\":null"));
+            assertProgress(get(player, ENGINE), 0, false);
+        }
+    }
+
     private String radioSignal(HttpClient client) throws Exception {
         HttpResponse<String> response = get(client, "/api/radio");
         assertEquals(200, response.statusCode());
