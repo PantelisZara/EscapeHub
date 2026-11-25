@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,12 +33,15 @@ public final class DemoServer implements AutoCloseable {
     private static final int MAX_ROOMS = 64;
     private static final int MAX_PLAYERS = 2;
     private static final int MAX_FORM_BYTES = 512;
+    // A 128-character password may use 12 encoded bytes per code point, plus the username and field names.
+    private static final int MAX_ACCOUNT_FORM_BYTES = 2_048;
     private static final String GENERATOR_POWER = "240";
     private static final List<String> MECHANISMS = List.of("open-valve", "prime-pump", "start-generator");
     private static final String LIGHTHOUSE_MARKER = "B";
     private static final Set<String> ARCHIVE_MARKERS = Set.of("A", LIGHTHOUSE_MARKER, "C");
     private static final Map<String, String> ASSETS = Map.of(
             "/", "index.html", "/style.css", "style.css", "/app.js", "app.js",
+            "/register", "register.html", "/register.js", "register.js",
             "/lighthouse.png", "lighthouse.png",
             "/fonts/GFSDidot-Regular.ttf", "fonts/GFSDidot-Regular.ttf",
             "/fonts/GFSNeohellenic.ttf", "fonts/GFSNeohellenic.ttf");
@@ -48,13 +52,18 @@ public final class DemoServer implements AutoCloseable {
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Room> rooms = new HashMap<>();
     private final Map<String, Session> sessions = new HashMap<>();
-    private final AccountRegistry accounts = new AccountRegistry();
+    private final AccountRegistry accounts;
 
     public DemoServer(int port) throws IOException {
-        this("127.0.0.1", port);
+        this("127.0.0.1", port, accountFile());
     }
 
-    private DemoServer(String bindAddress, int port) throws IOException {
+    DemoServer(int port, Path accountFile) throws IOException {
+        this("127.0.0.1", port, accountFile);
+    }
+
+    private DemoServer(String bindAddress, int port, Path accountFile) throws IOException {
+        accounts = new AccountRegistry(accountFile);
         Properties snapshot = new Properties();
         try (var resource = DemoServer.class.getResourceAsStream("/data/akrotiri-lighthouse.properties")) {
             if (resource == null) {
@@ -80,9 +89,13 @@ public final class DemoServer implements AutoCloseable {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
+    private static Path accountFile() {
+        return Path.of(System.getenv().getOrDefault("ESCAPEHUB_ACCOUNTS_FILE", ".data/accounts.tsv"));
+    }
+
     public static void main(String[] args) throws IOException {
         String bindAddress = System.getenv().getOrDefault("ESCAPEHUB_BIND_ADDRESS", "127.0.0.1");
-        DemoServer demo = new DemoServer(bindAddress, args.length == 0 ? 8080 : Integer.parseInt(args[0]));
+        DemoServer demo = new DemoServer(bindAddress, args.length == 0 ? 8080 : Integer.parseInt(args[0]), accountFile());
         Runtime.getRuntime().addShutdownHook(new Thread(demo::close));
         demo.start();
         System.out.println("EscapeHub: " + demo.url());
@@ -115,7 +128,7 @@ public final class DemoServer implements AutoCloseable {
                 }
                 String type = switch (path) {
                     case "/style.css" -> "text/css";
-                    case "/app.js" -> "text/javascript";
+                    case "/app.js", "/register.js" -> "text/javascript";
                     case "/lighthouse.png" -> "image/png";
                     case "/fonts/GFSDidot-Regular.ttf", "/fonts/GFSNeohellenic.ttf" -> "font/ttf";
                     default -> "text/html";
@@ -138,7 +151,7 @@ public final class DemoServer implements AutoCloseable {
             methodNotAllowed(exchange, "POST");
             return;
         }
-        Map<String, String> form = readForm(exchange);
+        Map<String, String> form = readForm(exchange, MAX_ACCOUNT_FORM_BYTES);
         if (form == null) {
             return;
         }
@@ -146,7 +159,13 @@ public final class DemoServer implements AutoCloseable {
             respond(exchange, 400, "text/plain", "Username and password required");
             return;
         }
-        AccountRegistry.RegistrationResult result = accounts.register(form.get("username"), form.get("password"));
+        AccountRegistry.RegistrationResult result;
+        try {
+            result = accounts.register(form.get("username"), form.get("password"));
+        } catch (IOException storageFailure) {
+            respond(exchange, 503, "text/plain", "Account storage unavailable");
+            return;
+        }
         if (!result.created()) {
             switch (result.error()) {
                 case DUPLICATE_USERNAME -> respond(exchange, 409, "text/plain", "Username already exists");
@@ -347,6 +366,10 @@ public final class DemoServer implements AutoCloseable {
     }
 
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {
+        return readForm(exchange, MAX_FORM_BYTES);
+    }
+
+    private Map<String, String> readForm(HttpExchange exchange, int maxBytes) throws IOException {
         String host = exchange.getRequestHeaders().getFirst("Host");
         String origin = "http://" + host;
         String local = "http://localhost:" + server.getAddress().getPort();
@@ -359,8 +382,8 @@ public final class DemoServer implements AutoCloseable {
             respond(exchange, 415, "text/plain", "Form data required");
             return null;
         }
-        byte[] body = exchange.getRequestBody().readNBytes(MAX_FORM_BYTES + 1);
-        if (body.length > MAX_FORM_BYTES) {
+        byte[] body = exchange.getRequestBody().readNBytes(maxBytes + 1);
+        if (body.length > maxBytes) {
             respond(exchange, 413, "text/plain", "Form data too large");
             return null;
         }

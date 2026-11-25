@@ -8,7 +8,8 @@
 Με εγκατεστημένο Docker, τρέξε το δημόσιο image του demo από το GitHub Container Registry. Η λήψη γίνεται χωρίς σύνδεση στο GitHub.
 
 ```sh
-docker run --rm --pull always -p 127.0.0.1:8080:8080 ghcr.io/panteliszara/escapehub:latest
+docker run --rm --pull always -p 127.0.0.1:8080:8080 \
+  -v escapehub-accounts:/var/lib/escapehub ghcr.io/panteliszara/escapehub:latest
 ```
 
 Εναλλακτικά, από τον φάκελο που περιέχει το `compose.yaml`:
@@ -66,4 +67,7 @@ java "-Djava.io.tmpdir=.cache/tmp" -cp target/classes gr.escapehub.web.DemoServe
 
 #### Λογαριασμοί
 
-- `POST /api/accounts` δέχεται form με `username` (3–24 χαρακτήρες, χωρίς κενά) και `password` (8–128 χαρακτήρες). Επιστρέφει `201` με `{"username": ...}` για έγκυρη εγγραφή, `400` για μη έγκυρα στοιχεία ή `409` αν το όνομα υπάρχει ήδη (ανεξαρτήτως πεζών/κεφαλαίων). Ο κωδικός αποθηκεύεται μόνο ως PBKDF2-HMAC-SHA256 hash.
+Ο σύνδεσμος «Δημιούργησε λογαριασμό» στην αρχική οθόνη ανοίγει τη φόρμα εγγραφής. Οι λογαριασμοί διατηρούνται μετά την επανεκκίνηση. Η είσοδος με λογαριασμό και η πρόοδος ανά παίκτη ανήκουν σε επόμενα stories.
+
+- `POST /api/accounts` δέχεται form με `username` (3–24 λατινικά γράμματα, ψηφία, `_` ή `-`) και `password` (8–128 χαρακτήρες Unicode, χωρίς χαρακτήρες ελέγχου ή μόνο κενά). Επιστρέφει `201` με `{"username": ...}`, `400` για μη έγκυρα στοιχεία, `409` για υπάρχον όνομα ανεξαρτήτως πεζών/κεφαλαίων, `413` για form άνω των 2 KiB ή `503` αν η εγγραφή δεν μπορεί να αποθηκευτεί.
+- Ο κωδικός αποθηκεύεται μόνο ως PBKDF2-HMAC-SHA256 hash με τυχαίο salt και 600.000 επαναλήψεις. Το `ESCAPEHUB_ACCOUNTS_FILE` ορίζει το αρχείο λογαριασμών. Η προεπιλογή είναι `.data/accounts.tsv` τοπικά και `/var/lib/escapehub/accounts.tsv` στο container. Το Compose χρησιμοποιεί μόνιμο volume. Χρησιμοποίησε ένα αρχείο ανά ενεργή διεργασία EscapeHub, σε ιδιωτικό φάκελο με δικαιώματα εγγραφής και υποστήριξη ατομικής μετονομασίας.

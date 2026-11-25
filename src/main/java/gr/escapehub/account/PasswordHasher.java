@@ -14,7 +14,7 @@ import javax.crypto.spec.PBEKeySpec;
 public final class PasswordHasher {
     private static final String ALGORITHM = "PBKDF2WithHmacSHA256";
     private static final String PREFIX = "pbkdf2-sha256";
-    private static final int ITERATIONS = 120_000;
+    private static final int ITERATIONS = 600_000;
     private static final int SALT_BYTES = 16;
     private static final int KEY_BITS = 256;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -28,43 +28,51 @@ public final class PasswordHasher {
         }
         byte[] salt = new byte[SALT_BYTES];
         RANDOM.nextBytes(salt);
-        byte[] derived = derive(password, salt, ITERATIONS, KEY_BITS);
+        byte[] derived = derive(password, salt, ITERATIONS);
         Base64.Encoder encoder = Base64.getEncoder();
         return PREFIX + "$" + ITERATIONS + "$" + encoder.encodeToString(salt)
                 + "$" + encoder.encodeToString(derived);
     }
 
     public static boolean verify(String password, String encodedHash) {
-        if (password == null || encodedHash == null) {
+        if (password == null) {
             return false;
+        }
+        ParsedHash hash = parse(encodedHash);
+        return hash != null && MessageDigest.isEqual(hash.key(), derive(password, hash.salt(), hash.iterations()));
+    }
+
+    static boolean isEncodedHash(String encodedHash) {
+        return parse(encodedHash) != null;
+    }
+
+    private static ParsedHash parse(String encodedHash) {
+        if (encodedHash == null) {
+            return null;
         }
         String[] parts = encodedHash.split("\\$", -1);
         if (parts.length != 4 || !PREFIX.equals(parts[0])) {
-            return false;
+            return null;
         }
-        int iterations;
-        byte[] salt;
-        byte[] expected;
         try {
-            iterations = Integer.parseInt(parts[1]);
-            if (iterations <= 0) {
-                return false;
+            int iterations = Integer.parseInt(parts[1]);
+            if (iterations <= 0 || iterations > ITERATIONS) {
+                return null;
             }
             Base64.Decoder decoder = Base64.getDecoder();
-            salt = decoder.decode(parts[2]);
-            expected = decoder.decode(parts[3]);
+            byte[] salt = decoder.decode(parts[2]);
+            byte[] key = decoder.decode(parts[3]);
+            if (salt.length == SALT_BYTES && key.length == KEY_BITS / Byte.SIZE) {
+                return new ParsedHash(iterations, salt, key);
+            }
         } catch (IllegalArgumentException invalidFormat) {
-            return false;
+            return null;
         }
-        if (salt.length == 0 || expected.length == 0) {
-            return false;
-        }
-        byte[] actual = derive(password, salt, iterations, expected.length * Byte.SIZE);
-        return MessageDigest.isEqual(expected, actual);
+        return null;
     }
 
-    private static byte[] derive(String password, byte[] salt, int iterations, int keyBits) {
-        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, keyBits);
+    private static byte[] derive(String password, byte[] salt, int iterations) {
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, KEY_BITS);
         try {
             return SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).getEncoded();
         } catch (NoSuchAlgorithmException | InvalidKeySpecException failure) {
@@ -73,4 +81,6 @@ public final class PasswordHasher {
             spec.clearPassword();
         }
     }
+
+    private record ParsedHash(int iterations, byte[] salt, byte[] key) { }
 }
