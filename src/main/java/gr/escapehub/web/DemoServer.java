@@ -39,7 +39,11 @@ public final class DemoServer implements AutoCloseable {
     private final Map<String, Room> sessions = new HashMap<>();
 
     public DemoServer(int port) throws IOException {
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+        this("127.0.0.1", port);
+    }
+
+    private DemoServer(String bindAddress, int port) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(bindAddress, port), 0);
         server.setExecutor(executor);
         server.createContext("/", this::handle);
     }
@@ -53,7 +57,8 @@ public final class DemoServer implements AutoCloseable {
     }
 
     public static void main(String[] args) throws IOException {
-        DemoServer demo = new DemoServer(args.length == 0 ? 8080 : Integer.parseInt(args[0]));
+        String bindAddress = System.getenv().getOrDefault("ESCAPEHUB_BIND_ADDRESS", "127.0.0.1");
+        DemoServer demo = new DemoServer(bindAddress, args.length == 0 ? 8080 : Integer.parseInt(args[0]));
         Runtime.getRuntime().addShutdownHook(new Thread(demo::close));
         demo.start();
         System.out.println("EscapeHub: " + demo.url());
