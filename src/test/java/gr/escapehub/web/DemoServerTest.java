@@ -9,6 +9,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,14 +30,17 @@ class DemoServerTest {
     private static final String ENGINE = "/api/engine-room";
     private static final String ROOM = "/api/room";
     private static final String LANTERN = "/api/lantern";
+    private static final String ACCOUNTS = "/api/accounts";
     private static final Pattern COMPLETION =
             Pattern.compile("\"completion\":\\{\"completedAt\":\"([^\"]+)\",\"durationSeconds\":(\\d+)\\}");
+    @TempDir
+    Path temporaryDirectory;
     private DemoServer server;
     private HttpClient player;
 
     @BeforeEach
     void start() throws IOException {
-        server = new DemoServer(0);
+        server = new DemoServer(0, temporaryDirectory.resolve("accounts.tsv"));
         server.start();
         player = newPlayer();
     }
@@ -371,9 +377,65 @@ class DemoServerTest {
     }
 
     @Test
+    void registersUniqueAccountsAndRejectsInvalidOrDuplicateRequests() throws Exception {
+        HttpResponse<String> created = post(player, ACCOUNTS, "username=Thanos_25&password=Password123");
+        assertEquals(201, created.statusCode());
+        assertEquals("{\"username\":\"Thanos_25\"}", created.body());
+        assertFalse(created.body().contains("Password123"));
+
+        HttpResponse<String> duplicate = post(player, ACCOUNTS,
+                "username=thanos_25&password=OtherPass123");
+        assertEquals(409, duplicate.statusCode());
+
+        assertEquals(400, post(player, ACCOUNTS, "username=ab&password=Password123").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser&password=short").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser").statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=validuser&password=Password123&extra=1").statusCode());
+    }
+
+    @Test
+    void acceptsMaximumLengthUnicodePasswordAndBoundsTheRegistrationForm() throws Exception {
+        String password = URLEncoder.encode("🗝".repeat(128), StandardCharsets.UTF_8);
+        String tooLong = URLEncoder.encode("🗝".repeat(129), StandardCharsets.UTF_8);
+
+        assertEquals(201, post(player, ACCOUNTS, "username=Keeper&password=" + password).statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=Second&password=" + tooLong).statusCode());
+        assertEquals(413, post(player, ACCOUNTS, "x".repeat(2049)).statusCode());
+        assertEquals(400, post(player, ACCOUNTS, "username=Θάνος&password=Password123").statusCode());
+    }
+
+    @Test
+    void reportsStorageFailureAndAllowsRegistrationAfterRecovery() throws Exception {
+        Path file = temporaryDirectory.resolve("accounts.tsv");
+        String form = "username=Keeper&password=Password123";
+        Files.createDirectory(file);
+
+        assertEquals(503, post(player, ACCOUNTS, form).statusCode());
+
+        Files.delete(file);
+        assertEquals(201, post(player, ACCOUNTS, form).statusCode());
+        server.close();
+        server = new DemoServer(0, file);
+        server.start();
+
+        assertEquals(409, post(player, ACCOUNTS, form).statusCode());
+    }
+
+    @Test
+    void servesRegistrationPageAndItsScript() throws Exception {
+        assertTrue(get(player, "/").body().contains("href=\"/register\""));
+        HttpResponse<String> page = get(player, "/register");
+        assertEquals(200, page.statusCode());
+        assertTrue(page.body().contains("method=\"post\" action=\"/api/accounts\""));
+        HttpResponse<String> script = get(player, "/register.js");
+        assertEquals(200, script.statusCode());
+        assertEquals("text/javascript", script.headers().firstValue("Content-Type").orElseThrow());
+    }
+
+    @Test
     void rejectsCrossOriginAndWrongMethodRequests() throws Exception {
         enter(player, "Άννα", "");
-        for (String path : List.of(ROOM, ENGINE)) {
+        for (String path : List.of(ROOM, ENGINE, ACCOUNTS)) {
             URI uri = URI.create(server.url() + path);
             HttpRequest crossOrigin = HttpRequest.newBuilder(uri).header("Origin", "https://other.example")
                     .POST(HttpRequest.BodyPublishers.ofString("name=Guest")).build();

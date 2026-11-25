@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172a38">
+  <title>Δημιουργία λογαριασμού — EscapeHub</title>
+  <link rel="icon" href="/lighthouse.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/register.js" defer></script>
+</head>
+<body>
+<main class="registration-page">
+  <section class="lobby registration" aria-labelledby="registration-title">
+    <span class="brand">EscapeHub</span>
+    <h1 id="registration-title">Δημιουργία λογαριασμού</h1>
+    <form id="registration-form" method="post" action="/api/accounts">
+      <label for="registration-username">Όνομα χρήστη</label>
+      <small id="username-format">3–24 λατινικά γράμματα, ψηφία, κάτω παύλες ή παύλες.</small>
+      <input id="registration-username" name="username" type="text" autocomplete="username" autocapitalize="none"
+             spellcheck="false" minlength="3" maxlength="24" pattern="[A-Za-z0-9_\-]{3,24}"
+             aria-describedby="username-format" required>
+      <label for="registration-password">Κωδικός πρόσβασης</label>
+      <small id="password-format">8–128 χαρακτήρες.</small>
+      <input id="registration-password" name="password" type="password" autocomplete="new-password" maxlength="256"
+             aria-describedby="password-format" required>
+      <button class="return-button" type="submit">Δημιούργησε λογαριασμό</button>
+      <p id="registration-feedback" role="status"></p>
+    </form>
+    <a class="text-button" href="/">Επιστροφή στον φάρο</a>
+  </section>
+</main>
+</body>
+</html>
