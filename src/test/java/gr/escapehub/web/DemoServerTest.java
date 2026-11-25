@@ -86,8 +86,18 @@ class DemoServerTest {
     }
 
     @Test
+    void catalogLinksToTheGuestMissionAndBack() throws Exception {
+        String catalog = get(player, "/").body();
+        assertTrue(catalog.contains("href=\"/play\""));
+        assertFalse(catalog.contains("id=\"guest-form\""));
+        String mission = get(player, "/play").body();
+        assertTrue(mission.contains("id=\"guest-form\""));
+        assertTrue(mission.contains("class=\"brand catalog-back\" href=\"/\""));
+    }
+
+    @Test
     void servesTheSceneAndOnlyAllowlistedResources() throws Exception {
-        for (String path : List.of("/", "/app.js", "/style.css", "/lighthouse.png")) {
+        for (String path : List.of("/", "/play", "/app.js", "/style.css", "/lighthouse.png")) {
             HttpResponse<String> response = get(player, path);
             assertEquals(200, response.statusCode());
             assertTrue(response.headers().firstValue("Content-Security-Policy").orElseThrow()
