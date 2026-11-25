@@ -39,7 +39,7 @@ public final class DemoServer implements AutoCloseable {
     private static final String LIGHTHOUSE_MARKER = "B";
     private static final Set<String> ARCHIVE_MARKERS = Set.of("A", LIGHTHOUSE_MARKER, "C");
     private static final Map<String, String> ASSETS = Map.of(
-            "/", "index.html", "/style.css", "style.css", "/app.js", "app.js",
+            "/", "catalog.html", "/play", "index.html", "/style.css", "style.css", "/app.js", "app.js",
             "/register", "register.html", "/register.js", "register.js",
             "/lighthouse.png", "lighthouse.png",
             "/fonts/GFSDidot-Regular.ttf", "fonts/GFSDidot-Regular.ttf",
