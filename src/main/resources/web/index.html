@@ -23,7 +23,7 @@
     <button class="place archive" id="open-archive" disabled><span class="pin"></span><span>Φυλάκιο<small id="archive-label">Ερεύνησε</small></span></button>
     <button class="place engine" id="open-engine" disabled><span class="pin"></span><span>Μηχανοστάσιο<small id="engine-label">Ερεύνησε</small></span></button>
     <button class="place radio" id="open-radio" disabled><span class="pin"></span><span>Ασύρματος<small id="radio-label">Ερεύνησε</small></span></button>
-    <button class="place lantern" id="open-lantern" disabled><span class="pin"></span><span>Φανάρι<small id="lantern-label">Χρειάζεται 3 ευρήματα</small></span></button>
+    <button class="place lantern" id="open-lantern" disabled><span class="pin"></span><span>Φανάρι<small id="lantern-label">Κλειδωμένο</small></span></button>
     </div>
     <section id="lobby" class="lobby" aria-labelledby="lobby-title" hidden>
       <h2 id="lobby-title">Έναρξη βάρδιας</h2>
@@ -52,7 +52,7 @@
     </div>
     <p id="connection" class="connection" role="status">Σύνδεση με τον φάρο…</p>
     <button id="reconnect" class="text-button" hidden>Δοκίμασε ξανά</button>
-    <p class="connection build-info">Έκδοση ${escapehub.build.version} · Commit <code>${escapehub.build.revision}</code></p>
+    <p class="connection build-info" title="${escapehub.build.revision}">Έκδοση ${escapehub.build.version} · Commit <code>${escapehub.build.revision}</code></p>
   </div>
 </main>
 <dialog id="lantern-dialog" aria-labelledby="lantern-title">
